@@ -24,6 +24,12 @@
         var d = retirement.values[ei].date;
         if (!earliest || d < earliest) earliest = d;
       }
+      if (retirement.contributions) {
+        for (var eci = 0; eci < retirement.contributions.length; eci++) {
+          var dc = retirement.contributions[eci].date;
+          if (!earliest || dc < earliest) earliest = dc;
+        }
+      }
       if (!earliest) return;
       for (var mi = 0; mi < market.length; mi++) {
         var mDate = market[mi].timestamp.slice(0, 10);
@@ -108,6 +114,10 @@
               ? activeVal * (proxyPrice / basePrice)
               : activeVal;
             activeVal = scaledVal + contribs[contrIdx].amount;
+            basePrice = proxyPrice;
+          } else {
+            // Account starts from zero; first contribution establishes the initial value
+            activeVal = contribs[contrIdx].amount;
             basePrice = proxyPrice;
           }
           contrIdx++;
