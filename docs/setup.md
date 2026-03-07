@@ -200,18 +200,21 @@ If you have employer-sponsored accounts (401k, HSA, 403b) that don't offer daily
   "accounts": [
     { "name": "401k", "proxy": "VTI" }
   ],
+  "contributions": [
+    { "date": "2023-06-01", "account": "401k", "amount": "10000" },
+    { "date": "2023-09-01", "account": "401k", "amount": "5000" },
+    { "date": "2024-01-01", "account": "401k", "amount": "5000" },
+    { "date": "2024-04-01", "account": "401k", "amount": "5000" }
+  ],
   "values": [
     { "date": "2024-01-01", "account": "401k", "value": "25000" }
-  ],
-  "contributions": [
-    { "date": "2024-01-01", "account": "401k", "amount": "25000" }
   ]
 }
 ```
 
-The `contributions` array tracks external capital (payroll deductions, employer matches). Without it, the Analysis tab's return metrics (TWR/XIRR) can't distinguish investment growth from deposited capital and would be wildly overstated. Contributions are also used as a minor refinement to daily value interpolation between ground truths.
+The `contributions` array is the primary way to track a retirement account. Each entry represents capital entering the account (payroll deductions, employer matches). The app starts the account at $0 on the first contribution date and builds daily values by accumulating deposits and scaling with a proxy ticker. Contributions are also required for the Analysis tab's return metrics (TWR/XIRR) — without them, the app can't distinguish investment growth from deposited capital.
 
-The app interpolates daily values by tracking how a proxy ticker moves between your ground-truth snapshots. Log in to your account every few weeks and add a new `values` entry — the chart self-corrects. See [Retirement Accounts](retirement.md) for details.
+Ground-truth `values` entries are optional but improve accuracy — they correct drift between the proxy and your account's actual performance. Log in every few weeks and add a new `values` entry to snap the estimate to reality. See [Retirement Accounts](retirement.md) for details.
 
 > **Important:** You also need to add an allocation entry in `config.json` for each retirement account. Without it the account will appear in the Overview and History tabs but will be **excluded from the Analysis tab** and the rebalancing calculator.
 
@@ -352,7 +355,7 @@ python3 utils/importers/import_fidelity.py \
 
 The script edits `retirement.json` in-place, adding or updating entries in the `contributions` array. Contributions on the same date are summed before upserting.
 
-**Note:** This importer handles contribution records only — it does not import account balances (the `values` array). You still need to manually log ground-truth account balances in `retirement.json` or via the History tab so the app can accurately interpolate daily values.
+**Note:** This importer handles contribution records only — it does not import account balances (the `values` array). The app will bootstrap the account from zero at the first contribution and track value via the proxy, so this is enough to get started. For better accuracy, periodically log ground-truth balances in `retirement.json` or via the History tab — each snapshot corrects any drift between the proxy and your account's real performance.
 
 ---
 
@@ -375,5 +378,5 @@ The script edits `retirement.json` in-place, adding or updating entries in the `
 - The web container runs as uid 1000. The bind-mounted data directory must be readable and writable by this user. Run `chown -R 1000:1000 <your-DATA_DIR>` on the host before starting.
 
 **Retirement account values not appearing**
-- Ensure the account is defined in `retirement.json`'s `accounts` array and has at least one entry in `values`.
-- The proxy ticker (default `VTI`) must have price data in `market.csv` covering the ground-truth date. If the proxy has no data for that date, interpolation can't start.
+- Ensure the account is defined in `retirement.json`'s `accounts` array and has at least one entry in `values` or `contributions`.
+- The proxy ticker (default `VTI`) must have price data in `market.csv` covering the earliest contribution or ground-truth date. If the proxy has no data for that date, interpolation can't start. Re-run the fetcher to backfill.

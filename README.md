@@ -74,7 +74,7 @@ All your financial data lives in a handful of plain files in your data directory
 | `trades.json` | Transaction log — buys, sells, donations, dividend reinvestments |
 | `market.csv` | Daily closing prices (fetched automatically or added by hand) |
 | `config.json` | Exposure categories, rebalancing targets, chart colors, capital gains method |
-| `retirement.json` | Manual accounts (401k, HSA) with periodic ground-truth values |
+| `retirement.json` | Manual accounts (401k, HSA) with contribution history and optional ground-truth values |
 | `assets.json` | Formula-driven assets — mortgage equity, I-bonds |
 
 Format details and examples for each file are covered in the [Setup Guide](docs/setup.md).
