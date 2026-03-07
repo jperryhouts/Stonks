@@ -1,0 +1,6 @@
+.devcontainer
+.env
+data/
+docs/plans/
+scratch/
+__pycache__/

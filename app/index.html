@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self';">
+    <title>Stonks</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="loading">
+    <nav id="tabs">
+        <button class="tab active" data-tab="chart" id="tab-chart-btn">Overview</button>
+        <button class="tab" data-tab="exposure">Analysis</button>
+        <button class="tab" data-tab="table">History</button>
+        <button class="tab" data-tab="gains">Gains</button>
+        <button class="tab" data-tab="trades">Trades</button>
+        <button class="tab" data-tab="tools">Tools</button>
+    </nav>
+    <main id="app">
+        <section id="panel-chart" class="panel">
+            <div id="chart-wrap">
+                <canvas id="chart"></canvas>
+                <div class="skeleton skeleton-chart" aria-hidden="true"></div>
+                <div id="loading-spinner" aria-hidden="true"></div>
+                <select id="time-window">
+                    <option value="1M">1 Month</option>
+                    <option value="90D">90 Days</option>
+                    <option value="YTD">YTD</option>
+                    <option value="PREV_YEAR" id="prev-year-option">Prev Year</option>
+                    <option value="1Y">1 Year</option>
+                    <option value="2Y" selected>2 Years</option>
+                    <option value="All">All</option>
+                </select>
+            </div>
+            <div class="skeleton skeleton-detail" aria-hidden="true">
+                <div class="skeleton-bar" style="width: 35%"></div>
+                <div class="skeleton-bar"></div>
+                <div class="skeleton-bar"></div>
+                <div class="skeleton-bar"></div>
+                <div class="skeleton-bar"></div>
+                <div class="skeleton-bar"></div>
+                <div class="skeleton-bar"></div>
+                <div class="skeleton-bar"></div>
+                <div class="skeleton-bar"></div>
+                <div class="skeleton-bar"></div>
+                <div class="skeleton-bar" style="width: 80%"></div>
+            </div>
+            <div id="detail" class="detail hidden">
+                <div class="detail-header">
+                    <h2 id="detail-date"></h2>
+                    <span id="detail-fetched"></span>
+                    <button id="detail-expand" class="detail-expand-btn" title="Show/hide shares &amp; price">Details</button>
+                </div>
+                <table id="detail-table">
+                    <thead>
+                        <tr>
+                            <th>Asset</th>
+                            <th class="col-shares">Shares</th>
+                            <th class="col-price">Price</th>
+                            <th>Value</th>
+                            <th>1D Change</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detail-body"></tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            <td class="col-shares"></td>
+                            <td class="col-price"></td>
+                            <td id="detail-total"></td>
+                            <td id="detail-change"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
+        <section id="panel-exposure" class="panel hidden"></section>
+        <section id="panel-table" class="panel hidden"></section>
+        <section id="panel-trades" class="panel hidden"></section>
+        <section id="panel-gains" class="panel hidden"></section>
+        <section id="panel-tools" class="panel hidden"></section>
+    </main>
+    <script src="js/fmt.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/retirement.js"></script>
+    <script src="js/assets.js"></script>
+    <script src="js/gains.js"></script>
+    <script src="js/returns.js"></script>
+    <script src="js/ui-utils.js"></script>
+    <script src="js/tools.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

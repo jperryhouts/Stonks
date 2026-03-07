@@ -1,0 +1,27 @@
+[
+  {
+    "type": "mortgage",
+    "name": "Home Equity",
+    "purchaseDate": "2024-06-15",
+    "homeValue": 200000,
+    "downPayment": 10000,
+    "loanTermYears": 30,
+    "annualRate": 0.0675,
+    "extraPayments": [
+      { "date": "2024-12-15", "amount": 500 },
+      { "date": "2025-07-01", "amount": 1000 }
+    ]
+  },
+  {
+    "type": "ibond",
+    "name": "I-Bond",
+    "purchaseDate": "2024-01-01",
+    "purchaseValue": 5000,
+    "fixedRate": 0.013,
+    "rates": [
+      { "setDate": "2024-01-01", "semiannualInflation": 0.0197 },
+      { "setDate": "2024-07-01", "semiannualInflation": 0.0177 },
+      { "setDate": "2025-01-01", "semiannualInflation": 0.0090 }
+    ]
+  }
+]

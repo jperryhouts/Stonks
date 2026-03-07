@@ -1,0 +1,3 @@
+PATH=/usr/local/bin:/usr/bin:/bin
+# Fetch prices every 5 min on weekdays during US market hours (9 AM – 5 PM ET ≈ 13:00–21:00 UTC in EDT)
+*/5 13-21 * * 1-5 . /etc/environment; python3 /opt/portfolio/utils/tickers/fetch_prices.py -d /opt/portfolio/data > /proc/1/fd/1 2>&1

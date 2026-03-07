@@ -1,0 +1,52 @@
+{
+  "symbolOrder": ["I-Bond", "401k", "Home Equity"],
+  "colors": [
+    { "fill": "rgba(239, 68, 68, 0.55)", "stroke": "rgb(239, 68, 68)" },
+    { "fill": "rgba(59, 130, 246, 0.55)", "stroke": "rgb(59, 130, 246)" },
+    { "fill": "rgba(245, 158, 11, 0.55)", "stroke": "rgb(245, 158, 11)" },
+    { "fill": "rgba(118, 185, 0, 0.55)", "stroke": "#76b900" },
+    { "fill": "rgba(168, 85, 247, 0.55)", "stroke": "rgb(168, 85, 247)" },
+    { "fill": "rgba(20, 184, 166, 0.55)", "stroke": "rgb(20, 184, 166)" },
+    { "fill": "rgba(236, 72, 153, 0.55)", "stroke": "rgb(236, 72, 153)" },
+    { "fill": "rgba(234, 179, 8, 0.55)", "stroke": "rgb(234, 179, 8)" }
+  ],
+  "capitalGains": {
+    "method": "FIFO"
+  },
+  "rebalancing": {
+    "categories": [
+      { "name": "NVDA", "subcategories": "NVDA" },
+      { "name": "Domestic (Ex-NVDA)", "subcategories": "Domestic (ex-NVDA)" },
+      { "name": "International Stock", "category": "International" },
+      { "name": "Bonds", "category": "Bonds" }
+    ],
+    "targets": {
+      "NVDA": "10",
+      "Domestic (Ex-NVDA)": "45",
+      "International Stock": "25",
+      "Bonds": "20"
+    },
+    "tradeable": ["NVDA", "VTI", "VXUS", "BND"],
+    "exclude": ["Home Equity"]
+  },
+  "exposure": {
+    "allocations": [
+      { "symbol": "NVDA", "category": "NVDA", "fraction": "1.0" },
+      { "symbol": "VTI", "category": "NVDA", "fraction": "0.067" },
+      { "symbol": "VTI", "category": "Domestic (ex-NVDA)", "fraction": "0.933" },
+      { "symbol": "VXUS", "category": "International", "fraction": "1.0" },
+      { "symbol": "BND", "category": "Bonds", "fraction": "1.0" },
+      { "symbol": "401k", "category": "NVDA", "fraction": "0.05025" },
+      { "symbol": "401k", "category": "Domestic (ex-NVDA)", "fraction": "0.69975" },
+      { "symbol": "401k", "category": "International", "fraction": "0.25" },
+      { "symbol": "I-Bond", "category": "Bonds", "fraction": "1.0" }
+    ],
+    "display": [
+      { "name": "Domestic Stock", "color": "#3b82f6", "subcategories": "NVDA, Domestic (ex-NVDA)" },
+      { "name": "NVDA", "color": "#76b900", "indent": "true", "category": "NVDA" },
+      { "name": "Non-NVDA", "color": "#6366f1", "indent": "true", "category": "Domestic (ex-NVDA)" },
+      { "name": "International Stock", "color": "#f59e0b", "category": "International" },
+      { "name": "Bonds", "color": "#14b8a6", "category": "Bonds" }
+    ]
+  }
+}

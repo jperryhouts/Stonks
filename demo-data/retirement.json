@@ -1,0 +1,16 @@
+{
+  "accounts": [
+    { "name": "401k", "proxy": "VTI" }
+  ],
+  "values": [
+    { "date": "2025-01-01", "account": "401k", "value": "12500" },
+    { "date": "2025-04-01", "account": "401k", "value": "12100" },
+    { "date": "2025-07-01", "account": "401k", "value": "15250" },
+    { "date": "2025-10-01", "account": "401k", "value": "16500" }
+  ],
+  "contributions": [
+    { "date": "2025-01-01", "account": "401k", "amount": "12500" },
+    { "date": "2025-04-01", "account": "401k", "amount": "1250" },
+    { "date": "2025-07-01", "account": "401k", "amount": "1250" }
+  ]
+}

@@ -1,0 +1,18 @@
+[
+  { "date": "2025-01-02", "symbol": "VTI",  "price": "285.77", "quantity": "7.00",  "note": "initial investment" },
+  { "date": "2025-01-02", "symbol": "VXUS", "price": "56.90",  "quantity": "17.57" },
+  { "date": "2025-01-02", "symbol": "BND",  "price": "68.99",  "quantity": "14.49" },
+  { "date": "2025-01-02", "symbol": "NVDA", "price": "138.27", "quantity": "30",     "note": "individual stock pick" },
+  { "date": "2025-02-14", "symbol": "VTI",  "price": "298.20", "quantity": "3.35",  "note": "recurring buy" },
+  { "date": "2025-03-14", "symbol": "VTI",  "price": "273.65", "quantity": "3.65" },
+  { "date": "2025-03-14", "symbol": "NVDA", "price": "121.65", "quantity": "20",     "note": "buying the dip" },
+  { "date": "2025-04-15", "symbol": "VTI",  "price": "261.43", "quantity": "3.82" },
+  { "date": "2025-04-15", "symbol": "VXUS", "price": "59.20",  "quantity": "16.89" },
+  { "date": "2025-05-15", "symbol": "VTI",  "price": "288.09", "quantity": "3.47" },
+  { "date": "2025-05-15", "symbol": "BND",  "price": "70.35",  "quantity": "14.22" },
+  { "date": "2025-06-13", "symbol": "NVDA", "price": "141.95", "quantity": "15",     "type": "sell", "lotDate": "2025-03-14", "note": "took profits" },
+  { "date": "2025-06-15", "symbol": "NVDA", "price": "180.43", "quantity": "10",     "type": "donate", "note": "charitable gift" },
+  { "date": "2025-06-16", "symbol": "VTI",  "price": "293.92", "quantity": "0.34",  "type": "drip", "note": "dividend reinvestment" },
+  { "date": "2025-07-15", "symbol": "VTI",  "price": "304.39", "quantity": "3.28" },
+  { "date": "2025-07-15", "symbol": "VXUS", "price": "67.16",  "quantity": "14.89" }
+]

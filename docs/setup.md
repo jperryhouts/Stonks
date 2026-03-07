@@ -1,0 +1,379 @@
+# Setup Guide
+
+This walks you through setting up the app with your own portfolio data.
+
+## Choose your path
+
+**Docker** (recommended): only Docker and Docker Compose required — no local Python or Node.js installation needed. A price-fetching container keeps market data current automatically during market hours.
+
+**Local**: requires Node.js (for the web server) and Python 3.10+ with `yfinance` (for price fetching). Prices stay current with a daily python fetcher script.
+
+Both paths use the same data files — you can start local and switch to Docker later.
+
+## Start the app with demo data
+
+The repo ships with demo data in `demo-data/`. Copy it to get a working app immediately:
+
+```bash
+cp -r demo-data/ data/
+```
+
+Then start the server:
+
+**Docker:**
+```bash
+cp .env.example .env
+# Edit .env if needed (DATA_DIR, PORT, AUTH_PASS)
+docker compose up -d
+```
+
+**Local:**
+```bash
+DATA_DIR=./data node app/serve.js
+```
+
+Open http://localhost:8000.
+
+> **What you get at this point:** A fully functional app with the demo portfolio — all six tabs work. Explore the interface before touching any data file. The next steps replace the demo content with your real holdings.
+
+> **Minimum setup:** Steps 1 and 2 are all you need to see your real portfolio. The Overview, History, Gains, and Trades tabs work with just `trades.json` and `market.csv`. Steps 3–5 add the Analysis tab exposure breakdown, rebalancing calculator, retirement accounts, and formula-driven assets.
+
+---
+
+## Step 1: Replace the sample trades
+
+Edit `data/trades.json` with your actual transaction history. Each trade has a date, symbol, price, quantity, and type:
+
+```json
+[
+  { "date": "2024-03-15", "symbol": "VTI",  "price": "252.10", "quantity": "10", "type": "buy" },
+  { "date": "2024-03-15", "symbol": "VXUS", "price": "55.80",  "quantity": "25", "type": "buy" },
+  { "date": "2024-03-15", "symbol": "BND",  "price": "71.50",  "quantity": "20", "type": "buy" }
+]
+```
+
+All values are strings. See [Transaction Log](trades.md) for the full format reference, including sell, DRIP, and donation types.
+
+> **Tip:** The Trades tab in the browser lets you add, edit, and delete trades without touching the JSON. For an initial import of a long history, editing the file directly is usually faster — but once you're set up, the UI is convenient for adding new trades one at a time.
+
+> **Importing from Charles Schwab?** See the [Schwab importer](#importing-from-charles-schwab) section at the bottom of this guide.
+
+> **What you get at this point:** The Trades tab shows your full transaction history, and the Gains tab shows realized gains. The Overview chart still shows demo prices — the next step fetches market data for your tickers.
+
+---
+
+## Step 2: Update market data for your tickers
+
+The fetcher automatically discovers which tickers to fetch by reading `trades.json` (and `retirement.json` if present). Historical gaps are filled automatically.
+
+**Docker:**
+```bash
+docker compose restart fetcher
+```
+
+Wait about a minute. The fetcher runs on startup, reads your tickers from `trades.json`, fetches current prices, and backfills any historical gaps automatically.
+
+**Local:**
+```bash
+python3 utils/tickers/fetch_prices.py -d data/
+```
+
+The script reads tickers from `trades.json`, fetches prices, and runs a backfill check automatically. Then refresh the browser.
+
+
+> **Note:** If you add a new ticker later, repeat this step — same commands, no extra flags needed.
+
+> **What you get at this point:** The Overview chart fills in with your portfolio's real price history. Gains tab return metrics now use accurate market data.
+
+---
+
+## Step 3: Configure exposure categories
+
+The Overview, History, Gains, and Trades tabs all work without any configuration. But to enable the Analysis tab breakdown and the rebalancing calculator, you need a `config.json` that maps your symbols to categories.
+
+The easiest approach: edit `data/config.json` (copied from the demo) to match your holdings — delete entries you don't need and adjust categories as needed.
+
+At minimum, the `config.json` needs an `exposure` section:
+
+```json
+{
+  "exposure": {
+    "allocations": [
+      { "symbol": "VTI",  "category": "US Stock",      "fraction": "1.0" },
+      { "symbol": "VXUS", "category": "International",  "fraction": "1.0" },
+      { "symbol": "BND",  "category": "Bonds",          "fraction": "1.0" }
+    ],
+    "display": [
+      { "name": "US Stock",      "color": "#3b82f6", "category": "US Stock" },
+      { "name": "International", "color": "#f59e0b", "category": "International" },
+      { "name": "Bonds",         "color": "#14b8a6", "category": "Bonds" }
+    ]
+  }
+}
+```
+
+- **`allocations`**: maps each symbol to a category with a fraction. Fractions for a given symbol must sum to 1.0.
+- **`display`**: defines the rows shown in the Analysis tab. Each entry has a name, color (for the donut chart), and the category it represents.
+
+This is enough to get started. The Analysis tab will show a pie chart and table breaking down your portfolio by these categories.
+
+### Fractional exposure (optional)
+
+If you hold both an index fund and an individual stock that's a component of that index, you can split the index fund's allocation to reveal the overlap. For example, if you hold NVDA directly and VTI (which is ~6.7% NVDA):
+
+```json
+{
+  "exposure": {
+    "allocations": [
+      { "symbol": "NVDA", "category": "NVDA",         "fraction": "1.0" },
+      { "symbol": "VTI",  "category": "NVDA",         "fraction": "0.067" },
+      { "symbol": "VTI",  "category": "US (ex-NVDA)", "fraction": "0.933" },
+      { "symbol": "VXUS", "category": "International", "fraction": "1.0" },
+      { "symbol": "BND",  "category": "Bonds",         "fraction": "1.0" }
+    ],
+    "display": [
+      { "name": "US Stock",      "color": "#3b82f6", "subcategories": "NVDA, US (ex-NVDA)" },
+      { "name": "NVDA",          "color": "#76b900", "indent": "true", "category": "NVDA" },
+      { "name": "Non-NVDA",      "color": "#6366f1", "indent": "true", "category": "US (ex-NVDA)" },
+      { "name": "International", "color": "#f59e0b", "category": "International" },
+      { "name": "Bonds",         "color": "#14b8a6", "category": "Bonds" }
+    ]
+  }
+}
+```
+
+Now VTI is split: 6.7% of its value counts toward NVDA, and the Analysis tab shows your true NVDA concentration across all holdings. See [Fractional Exposure Tracking](exposure.md) for a full walkthrough.
+
+### Rebalancing targets (optional)
+
+Add a `rebalancing` section to enable the Tools tab calculator:
+
+```json
+{
+  "rebalancing": {
+    "categories": [
+      { "name": "US Stock",      "category": "US Stock" },
+      { "name": "International", "category": "International" },
+      { "name": "Bonds",         "category": "Bonds" }
+    ],
+    "targets": {
+      "US Stock": "60",
+      "International": "25",
+      "Bonds": "15"
+    },
+    "tradeable": ["VTI", "VXUS", "BND"]
+  }
+}
+```
+
+Target percentages should sum to 100. The `tradeable` array lists symbols the rebalancing calculator is allowed to suggest buying or selling.
+
+### Other config options
+
+```json
+{
+  "symbolOrder": ["Home Equity", "401k"],
+  "capitalGains": { "method": "FIFO" },
+  "colors": [
+    { "fill": "rgba(59, 130, 246, 0.55)", "stroke": "#3b82f6" },
+    { "fill": "rgba(245, 158, 11, 0.55)", "stroke": "#f59e0b" }
+  ]
+}
+```
+
+- **`symbolOrder`**: symbols listed here are rendered at the bottom of the stacked area chart (visually "behind" other symbols). Useful for pushing stable assets like home equity or retirement accounts to the base of the chart.
+- **`capitalGains.method`**: `"FIFO"` (default) or `"LIFO"` — determines default lot matching order for the Gains tab. This can be overriden for individual sell trades with the "lotDate" field. See [Transaction Log](trades.md) for details.
+- **`colors`**: chart color palette. Colors cycle when there are more symbols than entries.
+
+> **What you get at this point:** The Analysis tab shows your actual exposure breakdown and donut chart. The Tools tab rebalancing calculator is live.
+
+---
+
+## Step 4: Retirement accounts (optional)
+
+If you have employer-sponsored accounts (401k, HSA, 403b) that don't offer daily price feeds, create `data/retirement.json`.
+
+> **Importing Fidelity 401k / HSA contribution history?** See the [Fidelity importer](#importing-from-fidelity) section at the bottom of this guide.
+
+```json
+{
+  "accounts": [
+    { "name": "401k", "proxy": "VTI" }
+  ],
+  "values": [
+    { "date": "2024-01-01", "account": "401k", "value": "25000" }
+  ],
+  "contributions": [
+    { "date": "2024-01-01", "account": "401k", "amount": "25000" }
+  ]
+}
+```
+
+The `contributions` array matters: payroll deposits and employer matches are external capital, not market returns. Without tracking them separately, the gains report would mistake a contribution for investment growth and overstate your returns.
+
+The app interpolates daily values by tracking how the proxy ticker moves between your ground-truth snapshots. Log in to your account every few weeks and add a new `values` entry — the chart self-corrects. See [Retirement Accounts](retirement.md) for how the interpolation works.
+
+> **Important:** You also need to add an allocation entry in `config.json` for each retirement account. Without it the account will appear in the Overview and History tabs but will be **excluded from the Analysis tab** and the rebalancing calculator.
+
+```json
+{ "symbol": "401k", "category": "US Stock", "fraction": "1.0" }
+```
+
+> **Proxy tickers:** Only exchange-listed ETF tickers work as proxies — mutual fund tickers like `FXAIX` or `VTSAX` are not supported by the price fetcher. Use an equivalent ETF instead (e.g. `SPY` or `VOO` in place of FXAIX, `VTI` in place of VTSAX).
+
+> If you set this up after already running [step 2](#step-2-update-market-data-for-your-tickers), re-run that step to backfill the proxy ticker's price history.
+
+---
+
+## Step 5: Deterministic assets (optional)
+
+For assets with formula-driven values (mortgage equity, I-bonds), create `data/assets.json`:
+
+```json
+[
+  {
+    "type": "mortgage",
+    "name": "Home Equity",
+    "purchaseDate": "2024-06-15",
+    "homeValue": 200000,
+    "downPayment": 10000,
+    "loanTermYears": 30,
+    "annualRate": 0.0675
+  }
+]
+```
+
+These appear in the chart alongside your other holdings. You may want to exclude them from rebalancing since they're not liquid:
+
+```json
+{
+  "rebalancing": {
+    "exclude": ["Home Equity"]
+  }
+}
+```
+
+See [Deterministic Assets](assets.md) for mortgage and I-bond configuration details.
+
+---
+
+## Keeping data current
+
+**Daily prices:** Handled automatically by the Docker fetcher during market hours. For local installs, run the command from [step 2](#step-2-update-market-data-for-your-tickers) at least once a day.
+
+**New trades:** Add them to `trades.json` by hand, or use the Trades tab in the browser (which saves back to the server when you click the "Save" button in the UI).
+
+**Retirement values:** Double click any retirement account cell in the History tab to update its ground-truth value, or edit `retirement.json` directly.
+
+**New tickers:** Add to `trades.json` and add allocation entries to `config.json`. Run `docker compose restart fetcher` (or `python3 utils/tickers/fetch_prices.py -d data/` locally) — the fetcher will backfill price history for the new symbol automatically.
+
+---
+
+## Importing from Charles Schwab
+
+If you have existing transaction history in Charles Schwab, `utils/importers/import_schwab.py` can convert Schwab's JSON exports to the `trades.json` format. It supports two Schwab export types:
+
+- **Brokerage Transaction History** — standard buy/sell/reinvestment transactions from brokerage accounts
+- **Equity Awards Center** — RSU vests and ESPP purchases from the Equity Awards section
+
+### Exporting from Schwab
+
+**Brokerage accounts:**
+1. Navigate to an account's Transaction History
+2. Set the Date Range (up to a four-year window) and click "Search"
+3. Click the download icon (top right, next to the printer icon)
+4. Save as JSON format
+
+**Equity Awards:**
+Download transaction history from the Equity Awards Center in the same way. You can export multiple files (e.g., one per year or one per account type).
+
+### Running the importer
+
+```bash
+python3 utils/importers/import_schwab.py /path/to/schwab-export.json > _tmp_trades.json
+# Multiple files:
+python3 utils/importers/import_schwab.py export1.json export2.json > _tmp_trades.json
+```
+
+The script writes converted trades to stdout, sorted in reverse chronological order. Review the output in `_tmp_trades.json`, then manually merge it into your `data/trades.json`.
+
+**What gets imported:**
+- Buys → `type: "buy"`
+- Sells (including sell-to-cover for tax withholding) → `type: "sell"`
+- Dividend reinvestment → `type: "drip"` with note `"reinvested dividend"`
+- RSU vests → `type: "buy"` with note indicating the grant ID
+- ESPP purchases → `type: "buy"` with note `"ESPP purchase"`
+
+Other transaction types (journal entries, dividends paid as cash, etc.) are skipped.
+
+The script is intentionally simple — it's designed for a one-time historical import, not an ongoing sync. Review the output before merging to catch anything that needs manual adjustment.
+
+> **Historical data gaps:** Schwab exports cover up to a 4-year window. If you've held a security for longer than that, the original purchase won't be in the export. The Gains tab will show "Insufficient shares" warnings for those sells — the realized gain calculation will be incomplete for those specific lots, but the rest of the portfolio data will work correctly.
+
+---
+
+## Importing from Fidelity
+
+If you have a Fidelity 401k or HSA, `utils/importers/import_fidelity.py` can import your contribution history into `retirement.json`. It reads Fidelity's CSV account history exports and upserts contribution records by date.
+
+It supports two Fidelity CSV export formats automatically:
+
+- **401k / workplace accounts** — CSV with `Date` and `Transaction Type` columns; rows where `Transaction Type == "Contributions"` are imported.
+- **Brokerage / HSA accounts** — CSV with `Run Date` and `Action` columns; rows where `Action` contains `"CONTR"` are imported.
+
+### Exporting from Fidelity
+
+1. Log in and navigate to the account (401k or HSA)
+2. Go to **Activity & Orders** → **History**
+3. Set the date range and download as CSV
+
+### Running the importer
+
+```bash
+# Import 401k contributions
+python3 utils/importers/import_fidelity.py \
+    --csv Fidelity_History_for_Account_XXXXX.csv \
+    --retirement data/retirement.json \
+    --account "401k"
+
+# Import HSA contributions
+python3 utils/importers/import_fidelity.py \
+    --csv Fidelity_History_for_Account_YYYYY.csv \
+    --retirement data/retirement.json \
+    --account "HSA"
+
+# Preview changes without writing
+python3 utils/importers/import_fidelity.py \
+    --csv Fidelity_History_for_Account_XXXXX.csv \
+    --retirement data/retirement.json \
+    --account "401k" \
+    --dry-run
+```
+
+The script edits `retirement.json` in-place, adding or updating entries in the `contributions` array. Contributions on the same date are summed before upserting.
+
+**Note:** This importer handles contribution records only — it does not import account balances (the `values` array). You still need to manually log ground-truth account balances in `retirement.json` or via the History tab so the app can accurately interpolate daily values.
+
+---
+
+## Troubleshooting
+
+**Chart is empty or shows no data**
+- If using Docker: wait a minute after `docker compose up` for the initial backfill to complete, then refresh the page.
+- If running locally: run `python3 utils/tickers/fetch_prices.py -d data/` to fetch and backfill price history for your tickers.
+- Check that `market.csv` has rows covering dates on or after your first trade. The chart only shows values for days where both a position and a price exist.
+
+**`fetch_prices.py` does nothing or shows an error**
+- The fetch script requires Python 3.10+ and `yfinance`. If you're using a virtual environment, make sure to activate it before running.
+- If you see a `SyntaxError` mentioning `type | None`, your Python version is too old — 3.10+ is required.
+- If you see `"Failed to fetch prices for: FXAIX"` (or another mutual fund ticker), the fetcher doesn't support mutual fund symbols. Change the proxy to an equivalent ETF — e.g. `SPY` or `VOO` instead of `FXAIX`, `VTI` instead of `VTSAX`.
+
+**Retirement account not appearing in the Analysis tab**
+- The account needs an allocation entry in `config.json` → `exposure.allocations`. Without it the account is visible in Overview/History but excluded from Analysis. See [Step 3](#step-3-configure-exposure-categories).
+
+**Docker: permission denied errors**
+- The web container runs as uid 1000. The bind-mounted data directory must be readable and writable by this user. Run `chown -R 1000:1000 <your-DATA_DIR>` on the host before starting.
+
+**Retirement account values not appearing**
+- Ensure the account is defined in `retirement.json`'s `accounts` array and has at least one entry in `values`.
+- The proxy ticker (default `VTI`) must have price data in `market.csv` covering the ground-truth date. If the proxy has no data for that date, interpolation can't start.
