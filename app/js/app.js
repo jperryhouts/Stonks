@@ -276,6 +276,7 @@ function drawChart(chart, data, hoverIdx) {
 function updateDetail(data, idx) {
   var pt = data.chartData[idx];
   var prev = idx > 0 ? data.chartData[idx - 1] : null;
+  var first = data.chartData[0];
   var symbols = data.symbols;
 
   document.getElementById("detail").classList.remove("hidden");
@@ -328,6 +329,15 @@ function updateDetail(data, idx) {
     }
     tr.appendChild(tdChg);
 
+    var tdWinChg = document.createElement("td");
+    tdWinChg.className = "col-win-chg";
+    var firstValue = first.values[sym] || 0;
+    var winChg = value - firstValue;
+    var winSign = winChg >= 0 ? "+" : "";
+    tdWinChg.textContent = winSign + fmtDollar(winChg);
+    tdWinChg.style.color = winChg >= 0 ? "#16a34a" : "#dc2626";
+    tr.appendChild(tdWinChg);
+
     tbody.appendChild(tr);
   }
 
@@ -342,6 +352,12 @@ function updateDetail(data, idx) {
   } else {
     totalChgEl.textContent = "\u2014";
   }
+
+  var winTotalEl = document.getElementById("detail-win-chg");
+  var winTotal = pt.total - first.total;
+  var winTotalSign = winTotal >= 0 ? "+" : "";
+  winTotalEl.textContent = winTotalSign + fmtDollar(winTotal);
+  winTotalEl.style.color = winTotal >= 0 ? "#16a34a" : "#dc2626";
 }
 
 function hideDetail() {

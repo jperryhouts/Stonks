@@ -138,12 +138,14 @@ main { line-height: 1.5; }
 
 @media (max-width: 520px) {
     .col-shares,
-    .col-price {
+    .col-price,
+    .col-win-chg {
         display: none;
     }
 
     .detail.detail-expanded .col-shares,
-    .detail.detail-expanded .col-price {
+    .detail.detail-expanded .col-price,
+    .detail.detail-expanded .col-win-chg {
         display: table-cell;
     }
 
