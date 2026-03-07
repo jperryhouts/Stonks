@@ -25,7 +25,7 @@ Tracks stocks, ETFs, and individual equities via daily market prices, retirement
 
 ![History — daily values per symbol](docs/screenshots/history.png)
 
-**Gains** -- Capital gains report (FIFO or LIFO), realized and unrealized.
+**Gains** -- Capital gains report (FIFO or average cost), realized and unrealized.
 
 ![Gains — realized, unrealized, and donation tracking](docs/screenshots/gains.png)
 

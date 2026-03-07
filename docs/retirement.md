@@ -32,7 +32,7 @@ Instead, Stonks tracks a **market proxy** — a ticker whose daily price is know
 
 - **`proxy`**: the ticker to track. Defaults to VTI if omitted.
 - **`values`**: ground-truth snapshots. You add these when you check your actual balance.
-- **`contributions`**: external capital additions (payroll deductions, employer matches). These are important for accurate interpolation — see below.
+- **`contributions`**: external capital additions (payroll deductions, employer matches). Required for accurate return metrics (TWR/XIRR) on the Analysis tab — without them, the app can't distinguish investment growth from deposited capital. Also used as a minor refinement to [interpolation](#effect-on-interpolation) between ground truths.
 
 ### The formula
 
@@ -42,7 +42,7 @@ On any given market day, the interpolated value is:
 value_today = anchor_value × (proxy_price_today / proxy_price_at_anchor)
 ```
 
-The **anchor** is the most recent ground truth or contribution adjustment. Each time a new ground truth arrives, it replaces the anchor entirely — this corrects any drift between the proxy and the actual account performance.
+The **anchor** consists of two values: `activeVal` (the base dollar amount) and `basePrice` (the proxy price at anchor time). Each time a new ground truth arrives, both are replaced entirely — `activeVal` becomes the ground truth value, and `basePrice` becomes the proxy price on that date. This corrects any drift between the proxy and the actual account performance.
 
 ### Worked example
 
@@ -61,40 +61,32 @@ The 401k is estimated at $13,044, reflecting VTI's 4.35% gain over that period.
 
 When the next ground truth arrives ($12,100 on 2025-04-01), the anchor resets. The proxy-based estimate gets corrected to the real value, and future interpolation starts from this new anchor.
 
-## Handling contributions
+## Why contributions matter
 
-Without contribution tracking, the model breaks down between ground truths. Suppose you contribute $1,250 on April 1. The ground truth on July 1 is $15,250. If the model doesn't know about the April contribution, it would attribute the entire increase from $12,100 to $15,250 to market growth — overstating the proxy ratio.
+The primary purpose of contributions is accurate return metrics. The Analysis tab computes TWR and XIRR for each retirement account. Each contribution is converted to a synthetic "buy" trade (quantity 1, price = contribution amount) and fed into these calculations. This tells the returns engine how much external capital entered the account and when.
 
-Contributions solve this by adjusting the anchor mid-stream:
+Without contributions, the app would treat the entire account value as investment return — if your 401k is worth $50,000 but you contributed $40,000 of that, XIRR needs to know about the $40,000 to report the correct 25% return instead of treating it as infinite return on zero investment.
 
-1. Scale the current anchor value to today's proxy price
-2. Add the contribution amount
-3. Set a new anchor at today's proxy price
+### Effect on interpolation
 
-```
-On 2025-04-01 (contribution day):
-  scaled_value = 12,100 × (proxy_apr1 / proxy_apr1) = $12,100  (same day as GT, ratio is 1)
-  new_anchor   = $12,100 + $1,250 = $13,350
-  new_base_price = proxy_apr1
+As a secondary benefit, contributions also refine the proxy-based interpolation between ground truths. Without them, the proxy model attributes all value changes to market movement. If you contribute $1,250 between two ground truths, the model would mistake that deposit for market growth, slightly distorting interpolated values in that window. In practice this effect is small — if you update ground truths regularly, the next snapshot corrects any drift.
 
-On 2025-05-15:
-  value = $13,350 × (proxy_may15 / proxy_apr1)
-```
+When a contribution arrives between ground truths, the interpolation engine:
 
-This way, the $1,250 contribution is treated as new capital, not market growth.
+1. Scales the current anchor value to today's proxy price
+2. Adds the contribution amount
+3. Sets a new anchor at today's proxy price
 
-### Contribution timing
-
-Contributions between two ground truths are applied incrementally. But contributions on or before the most recent ground truth date are skipped — their effect is already baked into the ground truth value.
+Contributions on or before the most recent ground truth date are skipped — their effect is already baked into the ground truth value.
 
 ## How values appear in the app
 
 Once interpolated, retirement account values are treated like any other symbol:
 
 - **Overview tab**: included in the stacked area chart. Order controlled by `symbolOrder` in `config.json` (retirement accounts are typically placed at the bottom of the stack).
-- **Analysis tab**: included in exposure calculations via fractional allocations (see [Exposure Tracking](exposure.md)). A 401k in a target-date fund can be split across Domestic, International, and Bond categories.
-- **History tab**: shows the interpolated daily value. Ground-truth cells are editable — click to update the value, which writes back to `retirement.json` via the server.
-- **Gains tab**: return metrics (TWR and XIRR) are computed separately for the brokerage portfolio and each retirement account, using contributions as cash flows.
+- **Analysis tab**: included in exposure calculations via fractional allocations (see [Exposure Tracking](exposure.md)). A 401k in a target-date fund can be split across Domestic, International, and Bond categories. TWR and XIRR return metrics are also computed here — contributions are the cash flows (see [Why contributions matter](#why-contributions-matter)).
+- **History tab**: shows the interpolated daily value. Ground-truth cells are editable — double-click to update the value (long-press on mobile), which writes back to `retirement.json` via the server.
+- **Gains tab**: shows capital gains (realized/unrealized) for brokerage symbols. Retirement accounts don't have individual trade lots, so they don't appear here.
 
 ## Adding a new retirement account
 

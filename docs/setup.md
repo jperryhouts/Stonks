@@ -182,7 +182,7 @@ Target percentages should sum to 100. The `tradeable` array lists symbols the re
 ```
 
 - **`symbolOrder`**: symbols listed here are rendered at the bottom of the stacked area chart (visually "behind" other symbols). Useful for pushing stable assets like home equity or retirement accounts to the base of the chart.
-- **`capitalGains.method`**: `"FIFO"` (default) or `"LIFO"` — determines default lot matching order for the Gains tab. This can be overriden for individual sell trades with the "lotDate" field. See [Transaction Log](trades.md) for details.
+- **`capitalGains.method`**: `"FIFO"` (default) or `"average_cost"` — lot matching method for the Gains tab. Individual sell trades can also specify a `lotDate` field to select a specific purchase lot by date, bypassing the default method. See [Transaction Log](trades.md) for details.
 - **`colors`**: chart color palette. Colors cycle when there are more symbols than entries.
 
 > **What you get at this point:** The Analysis tab shows your actual exposure breakdown and donut chart. The Tools tab rebalancing calculator is live.
@@ -209,9 +209,9 @@ If you have employer-sponsored accounts (401k, HSA, 403b) that don't offer daily
 }
 ```
 
-The `contributions` array matters: payroll deposits and employer matches are external capital, not market returns. Without tracking them separately, the gains report would mistake a contribution for investment growth and overstate your returns.
+The `contributions` array tracks external capital (payroll deductions, employer matches). Without it, the Analysis tab's return metrics (TWR/XIRR) can't distinguish investment growth from deposited capital and would be wildly overstated. Contributions are also used as a minor refinement to daily value interpolation between ground truths.
 
-The app interpolates daily values by tracking how the proxy ticker moves between your ground-truth snapshots. Log in to your account every few weeks and add a new `values` entry — the chart self-corrects. See [Retirement Accounts](retirement.md) for how the interpolation works.
+The app interpolates daily values by tracking how a proxy ticker moves between your ground-truth snapshots. Log in to your account every few weeks and add a new `values` entry — the chart self-corrects. See [Retirement Accounts](retirement.md) for details.
 
 > **Important:** You also need to add an allocation entry in `config.json` for each retirement account. Without it the account will appear in the Overview and History tabs but will be **excluded from the Analysis tab** and the rebalancing calculator.
 
