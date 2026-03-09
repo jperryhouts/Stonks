@@ -1,14 +1,18 @@
 FROM node:20-slim
 
+ARG UID=1000
+ARG GID=1000
+
 WORKDIR /opt/portfolio
 
 COPY app/ app/
 
-# node:20-slim ships with a "node" user (uid 1000). Run as that user so the
-# process has no root privileges.
-# Note: the data/ bind-mount must be readable/writable by uid 1000
-# on the host (e.g. `chown -R 1000:1000 ./data` before first run).
-RUN chown -R node:node /opt/portfolio
+# node:20-slim ships with a "node" user/group at 1000:1000. Adjust them to
+# the requested UID:GID so the process matches the host data directory owner.
+# Override via UID/GID build args (or the matching .env variables) — no manual
+# chown of the data/ bind-mount needed when these match the host owner.
+RUN groupmod -g ${GID} node && usermod -u ${UID} -g ${GID} node \
+    && chown -R node:node /opt/portfolio
 
 USER node
 

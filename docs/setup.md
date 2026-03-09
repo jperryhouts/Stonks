@@ -375,7 +375,7 @@ The script edits `retirement.json` in-place, adding or updating entries in the `
 - The account needs an allocation entry in `config.json` → `exposure.allocations`. Without it the account is visible in Overview/History but excluded from Analysis. See [Step 3](#step-3-configure-exposure-categories).
 
 **Docker: permission denied errors**
-- The web container runs as uid 1000. The bind-mounted data directory must be readable and writable by this user. Run `chown -R 1000:1000 <your-DATA_DIR>` on the host before starting.
+- The web container runs as the UID/GID specified in `.env` (default 1000:1000). Set `UID` and `GID` to match the owner of your data directory (run `id -u` and `id -g` to find your values), then rebuild with `docker compose build web`. Alternatively, run `chown -R 1000:1000 <your-DATA_DIR>` to match the defaults.
 
 **Retirement account values not appearing**
 - Ensure the account is defined in `retirement.json`'s `accounts` array and has at least one entry in `values` or `contributions`.
