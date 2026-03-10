@@ -25,6 +25,7 @@ var SYMBOL_ORDER = [];
 var GAINS_METHOD = "FIFO";
 var REBALANCING_CONFIG = { categories: [], targets: {}, tradeable: null, exclude: [] };
 var ANALYSIS_WINDOW = "1Y";
+var GAINS_WINDOW = "YTD";
 
 var PAD = { top: 12, right: 8, bottom: 28, left: 72 };
 var ASPECT = 0.45;
@@ -1263,159 +1264,273 @@ function buildGainsPanel(gainsData) {
     return td;
   }
 
-  // -- Summary table --
-  var summaryWrap = document.createElement("div");
-  summaryWrap.className = "gains-summary";
+  // -- Sub-tab bar --
+  var subtabBar = document.createElement("div");
+  subtabBar.className = "tools-subtabs";
 
-  var sTable = document.createElement("table");
-  sTable.className = "gains-summary-table";
+  var realizedBtn = document.createElement("button");
+  realizedBtn.className = "tools-subtab active";
+  realizedBtn.textContent = "Realized & Donations";
 
-  var sThead = document.createElement("thead");
-  var sHr = document.createElement("tr");
+  var unrealizedBtn = document.createElement("button");
+  unrealizedBtn.className = "tools-subtab";
+  unrealizedBtn.textContent = "Unrealized";
+
+  subtabBar.appendChild(realizedBtn);
+  subtabBar.appendChild(unrealizedBtn);
+  container.appendChild(subtabBar);
+
+  var realizedPanel = document.createElement("div");
+  var unrealizedPanel = document.createElement("div");
+  unrealizedPanel.className = "hidden";
+
+  realizedBtn.addEventListener("click", function () {
+    realizedBtn.classList.add("active");
+    unrealizedBtn.classList.remove("active");
+    realizedPanel.classList.remove("hidden");
+    unrealizedPanel.classList.add("hidden");
+  });
+  unrealizedBtn.addEventListener("click", function () {
+    unrealizedBtn.classList.add("active");
+    realizedBtn.classList.remove("active");
+    unrealizedPanel.classList.remove("hidden");
+    realizedPanel.classList.add("hidden");
+  });
+
+  // -- Window selector header (Realized panel) --
+  var wHeader = document.createElement("div");
+  wHeader.className = "gains-window-header";
+  var wLabel = document.createElement("span");
+  wLabel.textContent = "Window:";
+  var wSel = document.createElement("select");
+  wSel.className = "analysis-window-select";
+  var prevYearLabel = String(new Date().getFullYear() - 1);
+  ["1M", "90D", "YTD", "PREV_YEAR", "1Y", "2Y", "All"].forEach(function (w) {
+    var opt = document.createElement("option");
+    opt.value = w;
+    opt.textContent = w === "90D" ? "90 Days" : w === "1M" ? "1 Month" :
+      w === "YTD" ? "YTD" : w === "PREV_YEAR" ? prevYearLabel :
+      w === "1Y" ? "1 Year" : w === "2Y" ? "2 Years" : "All";
+    if (w === GAINS_WINDOW) opt.selected = true;
+    wSel.appendChild(opt);
+  });
+  wHeader.appendChild(wLabel);
+  wHeader.appendChild(wSel);
+  realizedPanel.appendChild(wHeader);
+
+  var realizedContent = document.createElement("div");
+  realizedPanel.appendChild(realizedContent);
+
+  function renderRealizedSections(win) {
+    realizedContent.innerHTML = "";
+
+    // Compute cutoff / endDate
+    var today = new Date().toISOString().slice(0, 10);
+    var cutoff = null, endDate = null, winLabel = win;
+    if (win === "YTD") {
+      cutoff = today.slice(0, 4) + "-01-01";
+    } else if (win === "PREV_YEAR") {
+      cutoff = prevYearLabel + "-01-01";
+      endDate = prevYearLabel + "-12-31";
+      winLabel = prevYearLabel;
+    } else if (win !== "All") {
+      var dayMap = { "1M": 30, "90D": 90, "1Y": 365, "2Y": 730 };
+      var rd = new Date(today);
+      rd.setDate(rd.getDate() - (dayMap[win] || 365));
+      cutoff = rd.toISOString().slice(0, 10);
+    }
+
+    function inWindow(entry) {
+      if (cutoff && entry.date < cutoff) return false;
+      if (endDate && entry.date > endDate) return false;
+      return true;
+    }
+
+    var filteredRealized = realized.filter(inWindow);
+    var filteredDonated = donated.filter(inWindow);
+
+    // Summary table (computed from filtered realized)
+    var stFiltered = 0, ltFiltered = 0;
+    for (var fi = 0; fi < filteredRealized.length; fi++) {
+      if (filteredRealized[fi].isLongTerm) ltFiltered += filteredRealized[fi].gain;
+      else stFiltered += filteredRealized[fi].gain;
+    }
+
+    var summaryWrap = document.createElement("div");
+    summaryWrap.className = "gains-summary";
+    var sTable = document.createElement("table");
+    sTable.className = "gains-summary-table";
+    var sThead = document.createElement("thead");
+    var sHr = document.createElement("tr");
+    ["", "Short-Term", "Long-Term"].forEach(function (h) {
+      var th = document.createElement("th");
+      th.textContent = h;
+      if (h !== "") th.className = "gains-num";
+      sHr.appendChild(th);
+    });
+    sThead.appendChild(sHr);
+    sTable.appendChild(sThead);
+    var sTbody = document.createElement("tbody");
+    var sRowStr = document.createElement("tr");
+    var sRowLabel = document.createElement("td");
+    sRowLabel.textContent = "Realized (" + winLabel + ")";
+    sRowStr.appendChild(sRowLabel);
+    sRowStr.appendChild(makeCell(fmtDollar(stFiltered), true, stFiltered));
+    sRowStr.appendChild(makeCell(fmtDollar(ltFiltered), true, ltFiltered));
+    sTbody.appendChild(sRowStr);
+    sTable.appendChild(sTbody);
+    summaryWrap.appendChild(sTable);
+    realizedContent.appendChild(summaryWrap);
+
+    // -- Realized gains table --
+    var realizedSection = document.createElement("div");
+    realizedSection.className = "gains-section";
+    var realizedTitle = document.createElement("h3");
+    realizedTitle.className = "gains-section-title";
+    realizedTitle.textContent = "Realized Gains";
+    realizedSection.appendChild(realizedTitle);
+
+    if (filteredRealized.length === 0) {
+      var emptyP = document.createElement("p");
+      emptyP.className = "gains-empty";
+      emptyP.textContent = "No realized gains recorded.";
+      realizedSection.appendChild(emptyP);
+    } else {
+      var rTable = document.createElement("table");
+      rTable.className = "gains-table";
+
+      var rThead = document.createElement("thead");
+      var rHr = document.createElement("tr");
+      var rHeaders = ["Date Sold", "Symbol", "Shares", "Cost Basis", "Proceeds", "Gain / Loss", "Hold", "Type"];
+      for (var rhi = 0; rhi < rHeaders.length; rhi++) {
+        var rth = document.createElement("th");
+        rth.textContent = rHeaders[rhi];
+        if (rhi >= 2) rth.className = "gains-num";
+        rHr.appendChild(rth);
+      }
+      rThead.appendChild(rHr);
+      rTable.appendChild(rThead);
+
+      // Sort by date descending
+      var sortedRealized = filteredRealized.slice().sort(function (a, b) {
+        return a.date > b.date ? -1 : a.date < b.date ? 1 : 0;
+      });
+
+      var rTbody = document.createElement("tbody");
+      for (var ri = 0; ri < sortedRealized.length; ri++) {
+        var r = sortedRealized[ri];
+        var rtr = document.createElement("tr");
+        rtr.appendChild(makeCell(fmtDateLong(r.date), false, null));
+        rtr.appendChild(makeCell(r.symbol, false, null));
+        if (r.warning) {
+          var warnTd = document.createElement("td");
+          warnTd.colSpan = 6;
+          warnTd.className = "gains-warning";
+          warnTd.textContent = "\u26a0 " + r.warning;
+          rtr.appendChild(warnTd);
+        } else {
+          rtr.appendChild(makeCell(fmtShares(r.shares), true, null));
+          rtr.appendChild(makeCell(fmtDollar(r.costBasis), true, null));
+          rtr.appendChild(makeCell(fmtDollar(r.proceeds), true, null));
+          var gainText = (r.gain >= 0 ? "+" : "") + fmtDollar(r.gain);
+          rtr.appendChild(makeCell(gainText, true, r.gain));
+          rtr.appendChild(makeCell(r.holdDays != null ? r.holdDays + "d" : "\u2014", true, null));
+          rtr.appendChild(makeCell(r.isLongTerm === null ? "\u2014" : r.isLongTerm ? "Long" : "Short", true, null));
+        }
+        rTbody.appendChild(rtr);
+      }
+      rTable.appendChild(rTbody);
+      realizedSection.appendChild(rTable);
+    }
+    realizedContent.appendChild(realizedSection);
+
+    // -- Donations table --
+    var donationsSection = document.createElement("div");
+    donationsSection.className = "gains-section";
+    var donationsTitle = document.createElement("h3");
+    donationsTitle.className = "gains-section-title";
+    donationsTitle.textContent = "Donations";
+    donationsSection.appendChild(donationsTitle);
+
+    if (filteredDonated.length === 0) {
+      var donationsEmpty = document.createElement("p");
+      donationsEmpty.className = "gains-empty";
+      donationsEmpty.textContent = "No donations recorded.";
+      donationsSection.appendChild(donationsEmpty);
+    } else {
+      var dTable = document.createElement("table");
+      dTable.className = "gains-table";
+
+      var dThead = document.createElement("thead");
+      var dHr = document.createElement("tr");
+      var dHeaders = ["Date Donated", "Symbol", "Shares", "Cost Basis", "FMV (Deduction)", "Forgone Gain", "Hold", "Type"];
+      for (var dhi = 0; dhi < dHeaders.length; dhi++) {
+        var dth = document.createElement("th");
+        dth.textContent = dHeaders[dhi];
+        if (dhi >= 2) dth.className = "gains-num";
+        dHr.appendChild(dth);
+      }
+      dThead.appendChild(dHr);
+      dTable.appendChild(dThead);
+
+      var sortedDonated = filteredDonated.slice().sort(function (a, b) {
+        return a.date > b.date ? -1 : a.date < b.date ? 1 : 0;
+      });
+
+      var dTbody = document.createElement("tbody");
+      for (var di = 0; di < sortedDonated.length; di++) {
+        var d = sortedDonated[di];
+        var dtr = document.createElement("tr");
+        dtr.appendChild(makeCell(fmtDateLong(d.date), false, null));
+        dtr.appendChild(makeCell(d.symbol, false, null));
+        dtr.appendChild(makeCell(fmtShares(d.shares), true, null));
+        dtr.appendChild(makeCell(fmtDollar(d.costBasis), true, null));
+        dtr.appendChild(makeCell(fmtDollar(d.fmvTotal), true, null));
+        var dGainText = (d.gain >= 0 ? "+" : "") + fmtDollar(d.gain);
+        dtr.appendChild(makeCell(dGainText, true, d.gain));
+        dtr.appendChild(makeCell(d.holdDays != null ? d.holdDays + "d" : "\u2014", true, null));
+        dtr.appendChild(makeCell(d.isLongTerm === null ? "\u2014" : d.isLongTerm ? "Long" : "Short", true, null));
+        dTbody.appendChild(dtr);
+      }
+      dTable.appendChild(dTbody);
+      donationsSection.appendChild(dTable);
+    }
+    realizedContent.appendChild(donationsSection);
+  }
+
+  renderRealizedSections(GAINS_WINDOW);
+
+  wSel.addEventListener("change", function () {
+    GAINS_WINDOW = wSel.value;
+    renderRealizedSections(GAINS_WINDOW);
+  });
+
+  // -- Unrealized summary --
+  var uSummaryWrap = document.createElement("div");
+  uSummaryWrap.className = "gains-summary";
+  var uSTable = document.createElement("table");
+  uSTable.className = "gains-summary-table";
+  var uSThead = document.createElement("thead");
+  var uSHr = document.createElement("tr");
   ["", "Short-Term", "Long-Term"].forEach(function (h) {
     var th = document.createElement("th");
     th.textContent = h;
     if (h !== "") th.className = "gains-num";
-    sHr.appendChild(th);
+    uSHr.appendChild(th);
   });
-  sThead.appendChild(sHr);
-  sTable.appendChild(sThead);
-
-  var sTbody = document.createElement("tbody");
-  var currentYear = new Date().getFullYear();
-
-  var summaryRows = [
-    ["Realized (" + currentYear + ")", summary.stRealizedThisYear, summary.ltRealizedThisYear],
-    ["Unrealized", summary.stUnrealized, summary.ltUnrealized],
-  ];
-  for (var si = 0; si < summaryRows.length; si++) {
-    var sr = summaryRows[si];
-    var str = document.createElement("tr");
-    var stlabel = document.createElement("td");
-    stlabel.textContent = sr[0];
-    str.appendChild(stlabel);
-    str.appendChild(makeCell(fmtDollar(sr[1]), true, sr[1]));
-    str.appendChild(makeCell(fmtDollar(sr[2]), true, sr[2]));
-    sTbody.appendChild(str);
-  }
-  sTable.appendChild(sTbody);
-  summaryWrap.appendChild(sTable);
-  container.appendChild(summaryWrap);
-
-  // -- Realized gains table --
-  var realizedSection = document.createElement("div");
-  realizedSection.className = "gains-section";
-  var realizedTitle = document.createElement("h3");
-  realizedTitle.className = "gains-section-title";
-  realizedTitle.textContent = "Realized Gains";
-  realizedSection.appendChild(realizedTitle);
-
-  if (realized.length === 0) {
-    var emptyP = document.createElement("p");
-    emptyP.className = "gains-empty";
-    emptyP.textContent = "No realized gains recorded.";
-    realizedSection.appendChild(emptyP);
-  } else {
-    var rTable = document.createElement("table");
-    rTable.className = "gains-table";
-
-    var rThead = document.createElement("thead");
-    var rHr = document.createElement("tr");
-    var rHeaders = ["Date Sold", "Symbol", "Shares", "Cost Basis", "Proceeds", "Gain / Loss", "Hold", "Type"];
-    for (var rhi = 0; rhi < rHeaders.length; rhi++) {
-      var rth = document.createElement("th");
-      rth.textContent = rHeaders[rhi];
-      if (rhi >= 2) rth.className = "gains-num";
-      rHr.appendChild(rth);
-    }
-    rThead.appendChild(rHr);
-    rTable.appendChild(rThead);
-
-    // Sort by date descending
-    var sortedRealized = realized.slice().sort(function (a, b) {
-      return a.date > b.date ? -1 : a.date < b.date ? 1 : 0;
-    });
-
-    var rTbody = document.createElement("tbody");
-    for (var ri = 0; ri < sortedRealized.length; ri++) {
-      var r = sortedRealized[ri];
-      var rtr = document.createElement("tr");
-      rtr.appendChild(makeCell(fmtDateLong(r.date), false, null));
-      rtr.appendChild(makeCell(r.symbol, false, null));
-      if (r.warning) {
-        var warnTd = document.createElement("td");
-        warnTd.colSpan = 6;
-        warnTd.className = "gains-warning";
-        warnTd.textContent = "\u26a0 " + r.warning;
-        rtr.appendChild(warnTd);
-      } else {
-        rtr.appendChild(makeCell(fmtShares(r.shares), true, null));
-        rtr.appendChild(makeCell(fmtDollar(r.costBasis), true, null));
-        rtr.appendChild(makeCell(fmtDollar(r.proceeds), true, null));
-        var gainText = (r.gain >= 0 ? "+" : "") + fmtDollar(r.gain);
-        rtr.appendChild(makeCell(gainText, true, r.gain));
-        rtr.appendChild(makeCell(r.holdDays != null ? r.holdDays + "d" : "\u2014", true, null));
-        rtr.appendChild(makeCell(r.isLongTerm === null ? "\u2014" : r.isLongTerm ? "Long" : "Short", true, null));
-      }
-      rTbody.appendChild(rtr);
-    }
-    rTable.appendChild(rTbody);
-    realizedSection.appendChild(rTable);
-  }
-  container.appendChild(realizedSection);
-
-  // -- Donations table --
-  var donationsSection = document.createElement("div");
-  donationsSection.className = "gains-section";
-  var donationsTitle = document.createElement("h3");
-  donationsTitle.className = "gains-section-title";
-  donationsTitle.textContent = "Donations";
-  donationsSection.appendChild(donationsTitle);
-
-  if (donated.length === 0) {
-    var donationsEmpty = document.createElement("p");
-    donationsEmpty.className = "gains-empty";
-    donationsEmpty.textContent = "No donations recorded.";
-    donationsSection.appendChild(donationsEmpty);
-  } else {
-    var dTable = document.createElement("table");
-    dTable.className = "gains-table";
-
-    var dThead = document.createElement("thead");
-    var dHr = document.createElement("tr");
-    var dHeaders = ["Date Donated", "Symbol", "Shares", "Cost Basis", "FMV (Deduction)", "Forgone Gain", "Hold", "Type"];
-    for (var dhi = 0; dhi < dHeaders.length; dhi++) {
-      var dth = document.createElement("th");
-      dth.textContent = dHeaders[dhi];
-      if (dhi >= 2) dth.className = "gains-num";
-      dHr.appendChild(dth);
-    }
-    dThead.appendChild(dHr);
-    dTable.appendChild(dThead);
-
-    var sortedDonated = donated.slice().sort(function (a, b) {
-      return a.date > b.date ? -1 : a.date < b.date ? 1 : 0;
-    });
-
-    var dTbody = document.createElement("tbody");
-    for (var di = 0; di < sortedDonated.length; di++) {
-      var d = sortedDonated[di];
-      var dtr = document.createElement("tr");
-      dtr.appendChild(makeCell(fmtDateLong(d.date), false, null));
-      dtr.appendChild(makeCell(d.symbol, false, null));
-      dtr.appendChild(makeCell(fmtShares(d.shares), true, null));
-      dtr.appendChild(makeCell(fmtDollar(d.costBasis), true, null));
-      dtr.appendChild(makeCell(fmtDollar(d.fmvTotal), true, null));
-      var dGainText = (d.gain >= 0 ? "+" : "") + fmtDollar(d.gain);
-      dtr.appendChild(makeCell(dGainText, true, d.gain));
-      dtr.appendChild(makeCell(d.holdDays != null ? d.holdDays + "d" : "\u2014", true, null));
-      dtr.appendChild(makeCell(d.isLongTerm === null ? "\u2014" : d.isLongTerm ? "Long" : "Short", true, null));
-      dTbody.appendChild(dtr);
-    }
-    dTable.appendChild(dTbody);
-    donationsSection.appendChild(dTable);
-  }
-  container.appendChild(donationsSection);
+  uSThead.appendChild(uSHr);
+  uSTable.appendChild(uSThead);
+  var uSTbody = document.createElement("tbody");
+  var uSRow = document.createElement("tr");
+  var uSLabel = document.createElement("td");
+  uSLabel.textContent = "Unrealized";
+  uSRow.appendChild(uSLabel);
+  uSRow.appendChild(makeCell(fmtDollar(summary.stUnrealized), true, summary.stUnrealized));
+  uSRow.appendChild(makeCell(fmtDollar(summary.ltUnrealized), true, summary.ltUnrealized));
+  uSTbody.appendChild(uSRow);
+  uSTable.appendChild(uSTbody);
+  uSummaryWrap.appendChild(uSTable);
+  unrealizedPanel.appendChild(uSummaryWrap);
 
   // -- Unrealized gains table --
   var unrealizedSection = document.createElement("div");
@@ -1450,48 +1565,77 @@ function buildGainsPanel(gainsData) {
     for (var ui = 0; ui < unrealized.length; ui++) {
       var u = unrealized[ui];
       var priceCell = u.currentPrice > 0 ? fmtDollar(u.currentPrice) : "\u2014";
-      if (u.isLongTerm === null && u.stShares > 0 && u.ltShares > 0) {
-        // Mixed FIFO: render a short-term row and a long-term row
-        var stAvgCost = u.stCost / u.stShares;
-        var ltAvgCost = u.ltCost / u.ltShares;
-        var stTr = document.createElement("tr");
-        stTr.appendChild(makeCell(u.symbol + " (ST)", false, null));
-        stTr.appendChild(makeCell(fmtShares(u.stShares), true, null));
-        stTr.appendChild(makeCell(fmtDollar(stAvgCost), true, null));
-        stTr.appendChild(makeCell(priceCell, true, null));
-        stTr.appendChild(makeCell(fmtDollar(u.stShares * u.currentPrice), true, null));
-        var stGainText = (u.stGain >= 0 ? "+" : "") + fmtDollar(u.stGain);
-        stTr.appendChild(makeCell(stGainText, true, u.stGain));
-        stTr.appendChild(makeCell("Short", true, null));
-        uTbody.appendChild(stTr);
-        var ltTr = document.createElement("tr");
-        ltTr.appendChild(makeCell(u.symbol + " (LT)", false, null));
-        ltTr.appendChild(makeCell(fmtShares(u.ltShares), true, null));
-        ltTr.appendChild(makeCell(fmtDollar(ltAvgCost), true, null));
-        ltTr.appendChild(makeCell(priceCell, true, null));
-        ltTr.appendChild(makeCell(fmtDollar(u.ltShares * u.currentPrice), true, null));
-        var ltGainText = (u.ltGain >= 0 ? "+" : "") + fmtDollar(u.ltGain);
-        ltTr.appendChild(makeCell(ltGainText, true, u.ltGain));
-        ltTr.appendChild(makeCell("Long", true, null));
-        uTbody.appendChild(ltTr);
-      } else {
-        var utr = document.createElement("tr");
-        utr.appendChild(makeCell(u.symbol, false, null));
-        utr.appendChild(makeCell(fmtShares(u.shares), true, null));
-        utr.appendChild(makeCell(fmtDollar(u.avgCostBasis), true, null));
-        utr.appendChild(makeCell(priceCell, true, null));
-        utr.appendChild(makeCell(fmtDollar(u.currentValue), true, null));
-        var uGainText = (u.gain >= 0 ? "+" : "") + fmtDollar(u.gain);
-        utr.appendChild(makeCell(uGainText, true, u.gain));
-        var typeText = u.isLongTerm === true ? "Long" : u.isLongTerm === false ? "Short" : "Mixed";
-        utr.appendChild(makeCell(typeText, true, null));
-        uTbody.appendChild(utr);
+      var typeText = u.isLongTerm === true ? "Long" : u.isLongTerm === false ? "Short" : "Mixed";
+      var uGainText = (u.gain >= 0 ? "+" : "") + fmtDollar(u.gain);
+
+      // Summary row (always one per symbol)
+      var utr = document.createElement("tr");
+      utr.setAttribute("data-symbol", u.symbol);
+
+      var symTd = document.createElement("td");
+      if (u.lotDetails && u.lotDetails.length > 0) {
+        var btn = document.createElement("button");
+        btn.className = "gains-expand-btn";
+        btn.textContent = "+";
+        symTd.appendChild(btn);
+      }
+      symTd.appendChild(document.createTextNode(u.symbol));
+      utr.appendChild(symTd);
+      utr.appendChild(makeCell(fmtShares(u.shares), true, null));
+      utr.appendChild(makeCell(fmtDollar(u.avgCostBasis), true, null));
+      utr.appendChild(makeCell(priceCell, true, null));
+      utr.appendChild(makeCell(fmtDollar(u.currentValue), true, null));
+      utr.appendChild(makeCell(uGainText, true, u.gain));
+      utr.appendChild(makeCell(typeText, true, null));
+      uTbody.appendChild(utr);
+
+      // Lot detail rows (hidden by default)
+      if (u.lotDetails && u.lotDetails.length > 0) {
+        var lotRows = [];
+        for (var li2 = 0; li2 < u.lotDetails.length; li2++) {
+          var ld = u.lotDetails[li2];
+          var lotTr = document.createElement("tr");
+          lotTr.className = "gains-lot-row hidden";
+
+          var dateTd = document.createElement("td");
+          dateTd.className = "gains-lot-label";
+          dateTd.textContent = ld.date;
+          lotTr.appendChild(dateTd);
+
+          var lotValue = ld.quantity * u.currentPrice;
+          var lotGainText = (ld.gain >= 0 ? "+" : "") + fmtDollar(ld.gain);
+          var holdText = ld.holdDays !== null
+            ? ld.holdDays + "d \u00b7 " + (ld.isLongTerm ? "Long" : "Short")
+            : "\u2014";
+
+          lotTr.appendChild(makeCell(fmtShares(ld.quantity), true, null));
+          lotTr.appendChild(makeCell(fmtDollar(ld.price), true, null));
+          lotTr.appendChild(makeCell(u.currentPrice > 0 ? fmtDollar(u.currentPrice) : "\u2014", true, null));
+          lotTr.appendChild(makeCell(u.currentPrice > 0 ? fmtDollar(lotValue) : "\u2014", true, null));
+          lotTr.appendChild(makeCell(lotGainText, true, ld.gain));
+          lotTr.appendChild(makeCell(holdText, true, null));
+
+          uTbody.appendChild(lotTr);
+          lotRows.push(lotTr);
+        }
+
+        // Attach click handler via closure
+        (function (expandBtn, rows) {
+          expandBtn.addEventListener("click", function () {
+            var expanded = expandBtn.textContent === "\u2212";
+            rows.forEach(function (r) { r.classList.toggle("hidden", expanded); });
+            expandBtn.textContent = expanded ? "+" : "\u2212";
+          });
+        })(btn, lotRows);
       }
     }
     uTable.appendChild(uTbody);
     unrealizedSection.appendChild(uTable);
   }
-  container.appendChild(unrealizedSection);
+  unrealizedPanel.appendChild(unrealizedSection);
+
+  container.appendChild(realizedPanel);
+  container.appendChild(unrealizedPanel);
 }
 
 // ---------------------------------------------------------------------------

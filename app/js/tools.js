@@ -613,14 +613,14 @@
       var tbody = document.createElement("tbody");
       result.categories.forEach(function (cat) {
         var tr = document.createElement("tr");
-        var diff = cat.targetPct - cat.currentPct;
+        var diff = cat.currentPct - cat.targetPct;
         var bs = fmtOverUnder(cat.buySell);
         var tdName = document.createElement("td"); tdName.textContent = cat.name; tr.appendChild(tdName);
         var tdCur = document.createElement("td"); tdCur.innerHTML = Portfolio.fmtDollar(cat.currentValue); tr.appendChild(tdCur);
         var tdCurPct = document.createElement("td"); tdCurPct.textContent = fmtPct(cat.currentPct); tr.appendChild(tdCurPct);
         var tdTgt = document.createElement("td"); tdTgt.textContent = fmtPct(cat.targetPct); tr.appendChild(tdTgt);
         var tdDiff = document.createElement("td");
-        tdDiff.className = diff > 0.05 ? "rebal-buy" : diff < -0.05 ? "rebal-sell" : "rebal-zero";
+        tdDiff.className = diff > 0.05 ? "rebal-sell" : diff < -0.05 ? "rebal-buy" : "rebal-zero";
         tdDiff.textContent = (diff >= 0 ? "+" : "") + fmtPct(diff);
         tr.appendChild(tdDiff);
         var tdBs = document.createElement("td"); tdBs.className = bs.cls; tdBs.textContent = bs.text; tr.appendChild(tdBs);

@@ -290,6 +290,7 @@
       var stShares = 0, ltShares = 0;
       var stCost = 0, ltCost = 0;
       var stGain = 0, ltGain = 0;
+      var lotDetails = [];
 
       var lastInfo = lastPrices[sym];
       var currentPrice = lastInfo ? lastInfo.price : 0;
@@ -306,7 +307,8 @@
             (new Date(currentDate) - new Date(lot.date)) / 86400000
           );
           var lotGain = lot.quantity * (currentPrice - lot.price);
-          if (holdDays > 365) {
+          var isLotLT = holdDays > 365;
+          if (isLotLT) {
             hasLT = true;
             ltUnrealized += lotGain;
             ltShares += lot.quantity;
@@ -319,6 +321,11 @@
             stCost += lot.quantity * lot.price;
             stGain += lotGain;
           }
+          lotDetails.push({ date: lot.date, price: lot.price, quantity: lot.quantity,
+            holdDays: holdDays, gain: lotGain, isLongTerm: isLotLT });
+        } else {
+          lotDetails.push({ date: lot.date, price: lot.price, quantity: lot.quantity,
+            holdDays: null, gain: 0, isLongTerm: null });
         }
       }
 
@@ -341,6 +348,7 @@
         ltCost: ltCost,
         stGain: stGain,
         ltGain: ltGain,
+        lotDetails: lotDetails,
       });
     }
 

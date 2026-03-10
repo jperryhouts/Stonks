@@ -25,7 +25,7 @@ Tracks stocks, ETFs, and individual equities via daily market prices, retirement
 
 ![History — daily values per symbol](docs/screenshots/history.png)
 
-**Gains** -- Capital gains report (FIFO or average cost), realized and unrealized.
+**Gains** -- Capital gains report (FIFO or average cost). Realized & Donations sub-tab has a time window filter (default YTD) that updates the ST/LT summary and both tables. Unrealized sub-tab shows a ST/LT summary and per-symbol rows with expandable lot-level detail.
 
 ![Gains — realized, unrealized, and donation tracking](docs/screenshots/gains.png)
 

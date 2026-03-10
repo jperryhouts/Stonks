@@ -589,6 +589,42 @@ main { line-height: 1.5; }
     padding: 0.2rem 0.6rem;
 }
 
+.gains-window-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+    color: #555;
+}
+
+.gains-expand-btn {
+    font-family: inherit;
+    font-size: 0.7rem;
+    border: 1px solid #ccc;
+    background: #f0f0f0;
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 0 0.3rem;
+    line-height: 1.5;
+    color: #555;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+}
+.gains-expand-btn:hover { background: #e0e0e0; }
+
+.gains-lot-row td {
+    background: #f9f9f9;
+    color: #555;
+    font-size: 0.775rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.gains-lot-label {
+    padding-left: 1.5rem;
+}
+
 /* -------------------------------------------------------------------------
    Loading skeleton & spinner
    ------------------------------------------------------------------------- */
