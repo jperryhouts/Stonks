@@ -8,8 +8,9 @@
    * @param {Array}  trades      - [{date, symbol, price, quantity, type?}] (strings)
    * @param {string} windowStart - "YYYY-MM-DD" inclusive
    * @param {string} windowEnd   - "YYYY-MM-DD" inclusive
-   * @returns {{ twr: number|null, xirr: number|null }}
-   *   Both are annualized decimal rates (0.12 = 12%). null = insufficient data.
+   * @returns {{ twr: number|null, xirr: number|null, twrCumulative: number|null, xirrCumulative: number|null }}
+   *   twr/xirr are annualized decimal rates (0.12 = 12%). twrCumulative/xirrCumulative are
+   *   total-period returns (not annualized). null = insufficient data.
    */
   function computeReturns(chartData, trades, windowStart, windowEnd) {
     // Slice chartData to window
@@ -18,12 +19,12 @@
       var d = chartData[i].date;
       if (d >= windowStart && d <= windowEnd) slice.push(chartData[i]);
     }
-    if (slice.length < 2) return { twr: null, xirr: null };
+    if (slice.length < 2) return { twr: null, xirr: null, twrCumulative: null, xirrCumulative: null };
 
     var days = Math.round(
       (new Date(slice[slice.length - 1].date) - new Date(slice[0].date)) / 86400000
     );
-    if (days < 1) return { twr: null, xirr: null };
+    if (days < 1) return { twr: null, xirr: null, twrCumulative: null, xirrCumulative: null };
 
     // Build a sorted list of chart dates for trade-date alignment
     var chartDatesSorted = [];
@@ -58,6 +59,8 @@
     // TWR — chain daily holding-period returns, stripping cash flows
     // -------------------------------------------------------------------
     var twr = null;
+    var twrCum = null;
+    var xirrCum = null;
     var chainProduct = 1;
     var prevTotal = slice[0].total;
 
@@ -71,6 +74,7 @@
         prevTotal = entry.total;
       }
       var totalReturn = chainProduct - 1;
+      twrCum = totalReturn;
       twr = Math.pow(1 + totalReturn, 365 / days) - 1;
     }
 
@@ -111,9 +115,10 @@
       cfs.push({ amount: endVal, t: new Date(slice[slice.length - 1].date).getTime() });
 
       xirr = _xirr(cfs);
+      if (xirr !== null) xirrCum = Math.pow(1 + xirr, days / 365) - 1;
     }
 
-    return { twr: twr, xirr: xirr };
+    return { twr: twr, xirr: xirr, twrCumulative: twrCum, xirrCumulative: xirrCum };
   }
 
   /**

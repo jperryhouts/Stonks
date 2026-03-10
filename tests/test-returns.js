@@ -345,3 +345,120 @@ describe("computeReturns retirement account contributions", () => {
     assert.ok(close(xirrB, 0.10, 0.02), `Account B XIRR expected ~0.10, got ${xirrB}`);
   });
 });
+
+// ---------------------------------------------------------------------------
+// twrCumulative — total period return (not annualized)
+// ---------------------------------------------------------------------------
+
+describe("computeReturns twrCumulative", () => {
+  it("is null when window has fewer than 2 data points", () => {
+    const cd = [{ date: days(0), total: 10000 }];
+    const { twrCumulative } = computeReturns(cd, [], days(0), days(0));
+    assert.equal(twrCumulative, null);
+  });
+
+  it("equals the simple total return for a 1-year 10% gain (same as annualized over exactly 1 year)", () => {
+    const cd = linearChart(10000, 11000, 365);
+    const { twr, twrCumulative } = computeReturns(cd, [], days(0), days(365));
+    assert.ok(twrCumulative !== null);
+    assert.ok(close(twrCumulative, 0.10, 0.001), `expected ~0.10, got ${twrCumulative}`);
+    assert.ok(close(twrCumulative, twr, 0.001), "over exactly 1 year, cumulative should match annualized");
+  });
+
+  it("is smaller than annualized twr for sub-year windows", () => {
+    // 5% gain over 6 months: cumulative = 5%, annualized ≈ 10.25%
+    const cd = linearChart(10000, 10500, 182);
+    const { twr, twrCumulative } = computeReturns(cd, [], days(0), days(182));
+    assert.ok(twrCumulative !== null && twr !== null);
+    assert.ok(close(twrCumulative, 0.05, 0.001), `expected ~0.05, got ${twrCumulative}`);
+    assert.ok(
+      twr > twrCumulative,
+      `annualized twr (${twr}) should exceed cumulative (${twrCumulative}) for a 6-month window`
+    );
+  });
+
+  it("is larger than annualized twr for multi-year windows", () => {
+    // 10% annualized over 2 years → cumulative ≈ 21%
+    const cd = linearChart(10000, 12100, 730);
+    const { twr, twrCumulative } = computeReturns(cd, [], days(0), days(730));
+    assert.ok(twrCumulative !== null && twr !== null);
+    assert.ok(close(twrCumulative, 0.21, 0.01), `expected ~0.21, got ${twrCumulative}`);
+    assert.ok(
+      twrCumulative > twr,
+      `cumulative (${twrCumulative}) should exceed annualized twr (${twr}) for a 2-year window`
+    );
+  });
+
+  it("correctly reflects a negative return period", () => {
+    const cd = linearChart(10000, 9000, 365);
+    const { twr, twrCumulative } = computeReturns(cd, [], days(0), days(365));
+    assert.ok(twrCumulative !== null);
+    assert.ok(close(twrCumulative, -0.10, 0.001), `expected ~-0.10, got ${twrCumulative}`);
+    assert.ok(twrCumulative < 0, "negative return window should produce negative twrCumulative");
+    assert.ok(close(twrCumulative, twr, 0.001), "over exactly 1 year, cumulative should match annualized for losses too");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// xirrCumulative — period-total return implied by the annualized XIRR
+// ---------------------------------------------------------------------------
+
+describe("computeReturns xirrCumulative", () => {
+  it("is null when window has fewer than 2 data points", () => {
+    const cd = [{ date: days(0), total: 10000 }];
+    const { xirrCumulative } = computeReturns(cd, [], days(0), days(0));
+    assert.equal(xirrCumulative, null);
+  });
+
+  it("is null for a zero-value portfolio where xirr cannot be computed", () => {
+    const cd = linearChart(0, 0, 365);
+    const { xirrCumulative } = computeReturns(cd, [], days(0), days(365));
+    assert.equal(xirrCumulative, null);
+  });
+
+  it("satisfies (1 + xirr)^(days/365) - 1 for a 6-month window", () => {
+    const cd = linearChart(10000, 10500, 182);
+    const { xirr, xirrCumulative } = computeReturns(cd, [], days(0), days(182));
+    assert.ok(xirr !== null && xirrCumulative !== null);
+    // Compute days the same way computeReturns does (from actual slice dates), to be
+    // timezone-robust (the days() helper can produce off-by-one results in non-UTC envs).
+    const actualDays = Math.round(
+      (new Date(cd[cd.length - 1].date) - new Date(cd[0].date)) / 86400000
+    );
+    const expected = Math.pow(1 + xirr, actualDays / 365) - 1;
+    assert.ok(
+      close(xirrCumulative, expected, 0.0001),
+      `expected (1+xirr)^(${actualDays}/365)-1 = ${expected}, got ${xirrCumulative}`
+    );
+  });
+
+  it("equals xirr for an exactly 1-year window (exponent = 1)", () => {
+    const cd = linearChart(10000, 11000, 365);
+    const { xirr, xirrCumulative } = computeReturns(cd, [], days(0), days(365));
+    assert.ok(xirr !== null && xirrCumulative !== null);
+    assert.ok(
+      close(xirrCumulative, xirr, 0.001),
+      `over 1 year, xirrCumulative (${xirrCumulative}) should equal xirr (${xirr})`
+    );
+  });
+
+  it("is smaller than xirr for sub-year windows (annualization inflates short periods)", () => {
+    const cd = linearChart(10000, 10500, 182);
+    const { xirr, xirrCumulative } = computeReturns(cd, [], days(0), days(182));
+    assert.ok(xirr !== null && xirrCumulative !== null);
+    assert.ok(
+      xirr > xirrCumulative,
+      `annualized xirr (${xirr}) should exceed cumulative (${xirrCumulative}) for a 6-month window`
+    );
+  });
+
+  it("is larger than xirr for multi-year windows", () => {
+    const cd = linearChart(10000, 12100, 730);
+    const { xirr, xirrCumulative } = computeReturns(cd, [], days(0), days(730));
+    assert.ok(xirr !== null && xirrCumulative !== null);
+    assert.ok(
+      xirrCumulative > xirr,
+      `cumulative (${xirrCumulative}) should exceed annualized xirr (${xirr}) for a 2-year window`
+    );
+  });
+});

@@ -767,6 +767,37 @@ body:not(.loading) #loading-spinner { display: none; }
     color: #999;
 }
 
+/* Group-span header cells ("Annualized" / "Cumulative") */
+.analysis-metric-group-header {
+    text-align: center;
+    padding-bottom: 0.2rem;
+    border-left: 1px solid #e8e8e8;
+    color: #888;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.analysis-metrics-table th.analysis-metric-group-header {
+    text-align: center;
+}
+
+/* Sub-rows: individual symbol lines under Investments */
+.analysis-metrics-sub-row td {
+    background: #fafafa;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #f5f5f5;
+}
+.analysis-metrics-sub-row .analysis-metric-value {
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+.analysis-metric-sub-label {
+    padding-left: 1.5rem;
+    color: #777;
+}
+
 /* -------------------------------------------------------------------------
    Tools tab — shared sub-tab bar
    ------------------------------------------------------------------------- */
