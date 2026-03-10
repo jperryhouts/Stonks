@@ -400,6 +400,66 @@ describe("computeReturns twrCumulative", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Asset not held at window start (bought mid-window)
+// ---------------------------------------------------------------------------
+
+describe("computeReturns: asset not held at window start", () => {
+  // 5-day window; asset bought on day 3 (zero value on days 1-2)
+  function midWindowChart() {
+    return [
+      { date: days(0), total: 0 },
+      { date: days(1), total: 0 },
+      { date: days(2), total: 1000 },  // bought here
+      { date: days(3), total: 1100 },
+      { date: days(4), total: 1210 },
+    ];
+  }
+  const midTrades = [
+    { date: days(2), symbol: 'S', price: '100', quantity: '10', type: 'buy' }
+  ];
+
+  it("returns non-null twr when asset is bought mid-window", () => {
+    const cd = midWindowChart();
+    const { twr } = computeReturns(cd, midTrades, days(0), days(4));
+    assert.notStrictEqual(twr, null);
+  });
+
+  it("twrCumulative reflects only the held-period return", () => {
+    const cd = midWindowChart();
+    // HPR day2→3: (1100 - 0) / 1000 - 1 = 0.10
+    // HPR day3→4: (1210 - 0) / 1100 - 1 = 0.10
+    // chainProduct = 1.1 * 1.1 = 1.21 → cumulative = 0.21
+    const { twrCumulative } = computeReturns(cd, midTrades, days(0), days(4));
+    assert.ok(twrCumulative !== null, "twrCumulative should not be null");
+    assert.ok(close(twrCumulative, 0.21, 0.001),
+      `expected twrCumulative ≈ 0.21, got ${twrCumulative}`);
+  });
+
+  it("returns null twr/xirr when asset has zero value throughout window", () => {
+    const cd = [
+      { date: days(0), total: 0 },
+      { date: days(1), total: 0 },
+      { date: days(2), total: 0 },
+    ];
+    const { twr, xirr } = computeReturns(cd, [], days(0), days(2));
+    assert.equal(twr, null);
+    assert.equal(xirr, null);
+  });
+
+  it("returns non-null xirr when asset is bought mid-window (longer window for convergence)", () => {
+    // Use a 180-day window so XIRR can converge (2-day windows produce astronomical rates)
+    const cd2 = [];
+    for (let i = 0; i <= 180; i++) {
+      cd2.push({ date: days(i), total: i < 90 ? 0 : 1000 + (i - 90) * 2 });
+    }
+    const trade2 = [{ date: days(90), symbol: 'S', price: '100', quantity: '10', type: 'buy' }];
+    const { xirr } = computeReturns(cd2, trade2, days(0), days(180));
+    assert.notStrictEqual(xirr, null);
+    assert.ok(xirr > 0, `expected positive xirr, got ${xirr}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // xirrCumulative — period-total return implied by the annualized XIRR
 // ---------------------------------------------------------------------------
 

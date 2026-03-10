@@ -64,15 +64,19 @@
     var chainProduct = 1;
     var prevTotal = slice[0].total;
 
-    if (prevTotal > 0) {
-      for (var si = 1; si < slice.length; si++) {
-        var entry = slice[si];
-        var cf = cfMap[entry.date] || 0;
-        if (prevTotal <= 0) { prevTotal = entry.total; continue; }
-        var hpr = (entry.total - cf) / prevTotal - 1;
-        chainProduct *= (1 + hpr);
-        prevTotal = entry.total;
-      }
+    var computedAnyHpr = false;
+
+    for (var si = 1; si < slice.length; si++) {
+      var entry = slice[si];
+      var cf = cfMap[entry.date] || 0;
+      if (prevTotal <= 0) { prevTotal = entry.total; continue; }
+      var hpr = (entry.total - cf) / prevTotal - 1;
+      chainProduct *= (1 + hpr);
+      prevTotal = entry.total;
+      computedAnyHpr = true;
+    }
+
+    if (computedAnyHpr) {
       var totalReturn = chainProduct - 1;
       twrCum = totalReturn;
       twr = Math.pow(1 + totalReturn, 365 / days) - 1;
