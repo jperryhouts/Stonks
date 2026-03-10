@@ -285,4 +285,63 @@ describe("computeReturns retirement account contributions", () => {
       `XIRR with withdrawal (${xirrWithdrawal}) should exceed without (${xirrClean})`
     );
   });
+
+  it("XIRR does not double-count a contribution on the first chart date", () => {
+    // Simulate a retirement account that starts from a $5k contribution on day 0,
+    // grows 10% over 365 days. The contribution is baked into slice[0].total AND
+    // represented as a synthetic trade.  XIRR should be ~10%, not wildly negative.
+    const cd = linearChart(5000, 5500, 365);
+    const trades = [{ date: days(0), quantity: "1", price: "5000", type: "buy" }];
+    const { xirr } = computeReturns(cd, trades, days(0), days(365));
+    assert.ok(xirr !== null, "xirr should not be null");
+    assert.ok(close(xirr, 0.10, 0.01), `expected ~0.10, got ${xirr}`);
+  });
+
+  it("XIRR does not double-count a contribution between windowStart and first chart date", () => {
+    // windowStart is day -1, but chart starts at day 0. A contribution on day -1
+    // is applied at day 0 (first chart entry), so it's in startVal. The trade
+    // should NOT also be counted as a separate cash flow.
+    const cd = linearChart(5000, 5500, 365);
+    const trades = [{ date: days(-1), quantity: "1", price: "5000", type: "buy" }];
+    // windowStart = days(-1), so the trade date is >= windowStart.
+    // Without the fix, this trade would pass the date filter AND be in startVal.
+    const { xirr } = computeReturns(cd, trades, days(-1), days(365));
+    assert.ok(xirr !== null, "xirr should not be null");
+    assert.ok(close(xirr, 0.10, 0.01), `expected ~0.10, got ${xirr}`);
+  });
+
+  it("frequent contributions show same XIRR as infrequent for the same proxy return", () => {
+    // Two accounts with the same 10% annual proxy return.
+    // Account A: one big contribution at start.
+    // Account B: 12 monthly contributions.
+    // Both should produce reasonable XIRR values (not wildly different).
+    const cdA = linearChart(12000, 13200, 365);
+    const tradesA = [{ date: days(0), quantity: "1", price: "12000", type: "buy" }];
+    const { xirr: xirrA } = computeReturns(cdA, tradesA, days(0), days(365));
+
+    // Account B: $1k monthly, each growing at proxy rate from contribution date
+    const cdB = [];
+    for (let i = 0; i <= 365; i++) {
+      let total = 0;
+      for (let m = 0; m < 12; m++) {
+        const contribDay = m * 30;
+        if (i >= contribDay) {
+          // Each $1k grows at ~10% annually from contribution date
+          const daysHeld = i - contribDay;
+          total += 1000 * Math.pow(1.10, daysHeld / 365);
+        }
+      }
+      cdB.push({ date: days(i), total });
+    }
+    const tradesB = [];
+    for (let m = 0; m < 12; m++) {
+      tradesB.push({ date: days(m * 30), quantity: "1", price: "1000", type: "buy" });
+    }
+    const { xirr: xirrB } = computeReturns(cdB, tradesB, days(0), days(365));
+
+    assert.ok(xirrA !== null && xirrB !== null);
+    // Both should be close to 10% — the underlying return rate
+    assert.ok(close(xirrA, 0.10, 0.02), `Account A XIRR expected ~0.10, got ${xirrA}`);
+    assert.ok(close(xirrB, 0.10, 0.02), `Account B XIRR expected ~0.10, got ${xirrB}`);
+  });
 });

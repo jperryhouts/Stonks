@@ -91,7 +91,10 @@
 
       for (var ti2 = 0; ti2 < trades.length; ti2++) {
         var tx2 = trades[ti2];
-        if (tx2.date < windowStart || tx2.date > windowEnd) continue;
+        // startVal already includes trades applied on or before slice[0].date
+        // (mergeRetirement folds contributions into the chart value on that date).
+        // Only count trades AFTER the first measurement date to avoid double-counting.
+        if (tx2.date <= slice[0].date || tx2.date > windowEnd) continue;
         var qty2 = parseFloat(tx2.quantity);
         var price2 = parseFloat(tx2.price);
         if (isNaN(qty2) || isNaN(price2)) continue;
