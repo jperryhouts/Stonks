@@ -1076,6 +1076,8 @@ function buildExposurePanel(data, trades, retirement, assets) {
   var metricsEl = document.createElement("div");
   metricsEl.className = "analysis-metrics";
 
+  var expandedMetricGroups = {}; // group name → true when expanded
+
   function renderMetrics() {
     var cd = data.chartData;
     if (cd.length === 0) { metricsEl.innerHTML = ""; return; }
@@ -1256,13 +1258,18 @@ function buildExposurePanel(data, trades, retirement, assets) {
           subRows.push(subTr);
         });
 
-        (function(expandBtn, rows) {
+        (function(expandBtn, rows, groupName) {
+          if (expandedMetricGroups[groupName]) {
+            rows.forEach(function(r) { r.classList.remove("hidden"); });
+            expandBtn.textContent = "\u2212";
+          }
           expandBtn.addEventListener("click", function() {
             var expanded = expandBtn.textContent === "\u2212";
             rows.forEach(function(r) { r.classList.toggle("hidden", expanded); });
             expandBtn.textContent = expanded ? "+" : "\u2212";
+            expandedMetricGroups[groupName] = !expanded;
           });
-        })(btn, subRows);
+        })(btn, subRows, group.name);
       }
     });
 
