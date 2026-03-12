@@ -286,6 +286,88 @@ describe("rebuildCumulatives", () => {
   });
 });
 
+describe("rebuildCumulatives with liabilitySymbols", () => {
+  it("with no liabilitySymbols: behavior unchanged", () => {
+    const data = {
+      symbols: ["VTI", "VXUS"],
+      chartData: [
+        { values: { VTI: 1000, VXUS: 500 }, cumulative: [], total: 0 },
+      ],
+      yMax: 0,
+    };
+    rebuildCumulatives(data);
+    assert.deepEqual(data.chartData[0].cumulative, [1000, 1500]);
+    assert.equal(data.chartData[0].total, 1500);
+  });
+
+  it("with liabilitySymbols: scales asset bands proportionally", () => {
+    const data = {
+      symbols: ["VTI", "VXUS", "Margin Loan"],
+      liabilitySymbols: ["Margin Loan"],
+      chartData: [
+        { values: { VTI: 6000, VXUS: 4000, "Margin Loan": -2000 }, cumulative: [], total: 0 },
+      ],
+      yMax: 0,
+    };
+    rebuildCumulatives(data);
+    // grossTotal = 6000 + 4000 = 10000, liability = -2000, net = 8000
+    // ratio = 8000/10000 = 0.8
+    // VTI scaled = 6000*0.8 = 4800, VXUS scaled = 4000*0.8 = 3200
+    // Margin Loan gets zero-width band (same cumulative as previous)
+    assert.equal(data.chartData[0].cumulative[0], 4800); // VTI
+    assert.equal(data.chartData[0].cumulative[1], 8000); // VTI + VXUS
+    assert.equal(data.chartData[0].cumulative[2], 8000); // Margin Loan = zero-width
+    assert.equal(data.chartData[0].total, 8000);
+  });
+
+  it("liability symbol gets zero-width band", () => {
+    const data = {
+      symbols: ["VTI", "Margin Loan"],
+      liabilitySymbols: ["Margin Loan"],
+      chartData: [
+        { values: { VTI: 10000, "Margin Loan": -3000 }, cumulative: [], total: 0 },
+      ],
+      yMax: 0,
+    };
+    rebuildCumulatives(data);
+    // grossTotal = 10000, net = 7000, ratio = 0.7
+    assert.equal(data.chartData[0].cumulative[0], 7000); // VTI scaled
+    assert.equal(data.chartData[0].cumulative[1], 7000); // Margin Loan = same
+    assert.equal(data.chartData[0].total, 7000);
+  });
+
+  it("total reflects net value", () => {
+    const data = {
+      symbols: ["VTI", "Loan"],
+      liabilitySymbols: ["Loan"],
+      chartData: [
+        { values: { VTI: 5000, Loan: -1000 }, cumulative: [], total: 0 },
+        { values: { VTI: 6000, Loan: -1000 }, cumulative: [], total: 0 },
+      ],
+      yMax: 0,
+    };
+    rebuildCumulatives(data);
+    assert.equal(data.chartData[0].total, 4000);
+    assert.equal(data.chartData[1].total, 5000);
+  });
+
+  it("yMax reflects net max", () => {
+    const data = {
+      symbols: ["VTI", "Loan"],
+      liabilitySymbols: ["Loan"],
+      chartData: [
+        { values: { VTI: 10000, Loan: -2000 }, cumulative: [], total: 0 },
+        { values: { VTI: 8000, Loan: -2000 }, cumulative: [], total: 0 },
+      ],
+      yMax: 0,
+    };
+    rebuildCumulatives(data);
+    assert.ok(data.yMax >= 8000);
+    // Net max is 8000 (first row), niceMax(8000) = 8000
+    assert.equal(data.yMax, 8000);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // applySymbolOrder
 // ---------------------------------------------------------------------------
@@ -331,5 +413,51 @@ describe("applySymbolOrder", () => {
     applySymbolOrder(data, ["VTI"]); // VTI moves to end: [VXUS, VTI]
     // cumulative should now be [50, 150]
     assert.deepEqual(data.chartData[0].cumulative, [50, 150]);
+  });
+
+  it("preserves liability scaling after reordering", () => {
+    const data = {
+      symbols: ["VTI", "VXUS", "Margin Loan"],
+      liabilitySymbols: ["Margin Loan"],
+      chartData: [
+        { values: { VTI: 6000, VXUS: 4000, "Margin Loan": -2000 }, cumulative: [], total: 0 },
+      ],
+      yMax: 0,
+    };
+    applySymbolOrder(data, ["VXUS"]); // reorder: [VTI, Margin Loan, VXUS]
+    // grossTotal = 10000, net = 8000, ratio = 0.8
+    // VTI scaled = 6000*0.8 = 4800
+    // Margin Loan = zero-width (stays at 4800)
+    // VXUS scaled = 4000*0.8 = 3200, cumulative = 4800+3200 = 8000
+    assert.equal(data.chartData[0].cumulative[0], 4800);  // VTI
+    assert.equal(data.chartData[0].cumulative[1], 4800);  // Margin Loan (zero-width)
+    assert.equal(data.chartData[0].cumulative[2], 8000);  // VXUS
+    assert.equal(data.chartData[0].total, 8000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// filterData with liabilitySymbols
+// ---------------------------------------------------------------------------
+
+describe("filterData liabilitySymbols", () => {
+  it("preserves liabilitySymbols in filtered result", () => {
+    const data = {
+      symbols: ["VTI", "Loan"],
+      liabilitySymbols: ["Loan"],
+      chartData: [
+        { date: "2024-01-02", total: 4000, values: { VTI: 5000, Loan: -1000 }, cumulative: [4000, 4000] },
+        { date: "2024-06-01", total: 4500, values: { VTI: 5500, Loan: -1000 }, cumulative: [4400, 4500] },
+        { date: "2024-12-31", total: 5000, values: { VTI: 6000, Loan: -1000 }, cumulative: [5000, 5000] },
+      ],
+      yMax: 5000,
+    };
+    const result = filterData(data, "YTD");
+    assert.deepEqual(result.liabilitySymbols, ["Loan"]);
+  });
+
+  it("liabilitySymbols is undefined when source has none", () => {
+    const result = filterData(FULL_DATA, "YTD");
+    assert.equal(result.liabilitySymbols, undefined);
   });
 });

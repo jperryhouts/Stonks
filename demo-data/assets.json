@@ -23,5 +23,13 @@
       { "setDate": "2024-07-01", "semiannualInflation": 0.0177 },
       { "setDate": "2025-01-01", "semiannualInflation": 0.0090 }
     ]
+  },
+  {
+    "type": "margin_loan",
+    "name": "Margin Loan",
+    "balances": [
+      { "date": "2025-01-15", "amount": "5000" },
+      { "date": "2025-06-01", "amount": "3000" }
+    ]
   }
 ]

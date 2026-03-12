@@ -24,6 +24,7 @@ var EXPOSURE_DISPLAY = [];
 var SYMBOL_ORDER = [];
 var GAINS_METHOD = "FIFO";
 var REBALANCING_CONFIG = { categories: [], targets: {}, tradeable: null, exclude: [] };
+var MARGIN_LOAN_DISPLAY = "proportional";
 var ANALYSIS_WINDOW = "1Y";
 var GAINS_WINDOW = "YTD";
 
@@ -91,6 +92,15 @@ async function loadConfig() {
       }
       if (Array.isArray(cfg.rebalancing.exclude)) {
         REBALANCING_CONFIG.exclude = cfg.rebalancing.exclude;
+      }
+    }
+    if (cfg.marginLoan && cfg.marginLoan.chartDisplay) {
+      var mode = cfg.marginLoan.chartDisplay;
+      if (mode === "proportional") {
+        MARGIN_LOAN_DISPLAY = mode;
+      } else {
+        console.warn("Unimplemented margin loan display mode: " + mode + "; using proportional");
+        MARGIN_LOAN_DISPLAY = "proportional";
       }
     }
   } catch (e) {
@@ -214,7 +224,14 @@ function drawChart(chart, data, hoverIdx) {
 
   // Stacked areas — draw topmost first so bottom layers paint over
   var symbols = data.symbols;
+  var liabSet = {};
+  if (data.liabilitySymbols) {
+    for (var lsi = 0; lsi < data.liabilitySymbols.length; lsi++) {
+      liabSet[data.liabilitySymbols[lsi]] = true;
+    }
+  }
   for (var si = symbols.length - 1; si >= 0; si--) {
+    if (liabSet[symbols[si]]) continue; // skip liability bands
     ctx.beginPath();
     // Top edge (cumulative[si])
     for (var di = 0; di < len; di++) {
@@ -290,7 +307,7 @@ function updateDetail(data, idx) {
     var sym = symbols[i];
     var shares = pt.positions[sym] || 0;
     var value = pt.values[sym] || 0;
-    if (value < 0.01 && shares < 1e-4) continue;
+    if (value < 0.01 && value > -0.01 && shares < 1e-4) continue;
     var price = parseFloat(pt.prices[sym]) || 0;
 
     var tr = document.createElement("tr");

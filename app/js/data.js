@@ -19,15 +19,55 @@
   exports.rebuildCumulatives = function rebuildCumulatives(data) {
     var chartData = data.chartData;
     var symbols = data.symbols;
+    var liabilities = data.liabilitySymbols || [];
+    var hasLiabilities = liabilities.length > 0;
+
+    // Build a lookup set for liability symbols
+    var isLiability = {};
+    if (hasLiabilities) {
+      for (var li = 0; li < liabilities.length; li++) {
+        isLiability[liabilities[li]] = true;
+      }
+    }
+
     for (var i = 0; i < chartData.length; i++) {
       var cd = chartData[i];
       cd.cumulative = [];
-      var running = 0;
-      for (var si = 0; si < symbols.length; si++) {
-        running += cd.values[symbols[si]] || 0;
-        cd.cumulative.push(running);
+
+      if (hasLiabilities) {
+        // Compute gross total (assets only) and liability total
+        var grossTotal = 0;
+        var liabilityTotal = 0;
+        for (var si = 0; si < symbols.length; si++) {
+          var v = cd.values[symbols[si]] || 0;
+          if (isLiability[symbols[si]]) {
+            liabilityTotal += v; // negative
+          } else {
+            grossTotal += v;
+          }
+        }
+        var netTotal = grossTotal + liabilityTotal;
+        var ratio = grossTotal > 0 ? netTotal / grossTotal : 1;
+
+        var running = 0;
+        for (var si2 = 0; si2 < symbols.length; si2++) {
+          if (isLiability[symbols[si2]]) {
+            // Zero-width band: keep same cumulative as previous
+            cd.cumulative.push(running);
+          } else {
+            running += (cd.values[symbols[si2]] || 0) * ratio;
+            cd.cumulative.push(running);
+          }
+        }
+        cd.total = netTotal;
+      } else {
+        var running2 = 0;
+        for (var si3 = 0; si3 < symbols.length; si3++) {
+          running2 += cd.values[symbols[si3]] || 0;
+          cd.cumulative.push(running2);
+        }
+        cd.total = running2;
       }
-      cd.total = running;
     }
     var rawMax = 0;
     for (var yi = 0; yi < chartData.length; yi++) {
@@ -152,6 +192,7 @@
 
     return {
       symbols: fullData.symbols,
+      liabilitySymbols: fullData.liabilitySymbols,
       chartData: filtered,
       yMax: niceMax(rawMax),
     };
@@ -167,15 +208,7 @@
       return symbolOrder.indexOf(s) === -1;
     });
     fullData.symbols = rest.concat(inOrder);
-    for (var i = 0; i < fullData.chartData.length; i++) {
-      var cd = fullData.chartData[i];
-      var runningVal = 0;
-      cd.cumulative = [];
-      for (var k = 0; k < fullData.symbols.length; k++) {
-        runningVal += cd.values[fullData.symbols[k]] || 0;
-        cd.cumulative.push(runningVal);
-      }
-    }
+    exports.rebuildCumulatives(fullData);
   };
 
 })(typeof module !== "undefined" && module.exports

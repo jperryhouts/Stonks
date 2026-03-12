@@ -13,6 +13,9 @@
   "capitalGains": {
     "method": "FIFO"
   },
+  "marginLoan": {
+    "chartDisplay": "proportional"
+  },
   "rebalancing": {
     "categories": [
       { "name": "NVDA", "subcategories": "NVDA" },

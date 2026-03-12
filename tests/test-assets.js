@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { computeMortgageEquity, computeIBondValue, mergeAssets } = require("../app/js/assets.js");
+const { computeMortgageEquity, computeIBondValue, computeMarginLoan, mergeAssets } = require("../app/js/assets.js");
 
 // ---------------------------------------------------------------------------
 // computeMortgageEquity
@@ -224,6 +224,61 @@ describe("computeIBondValue", () => {
 });
 
 // ---------------------------------------------------------------------------
+// computeMarginLoan
+// ---------------------------------------------------------------------------
+
+describe("computeMarginLoan", () => {
+  const LOAN = {
+    type: "margin_loan",
+    name: "Margin Loan",
+    balances: [
+      { date: "2025-06-01", amount: "50000" },
+      { date: "2025-09-01", amount: "30000" },
+    ],
+  };
+
+  it("returns 0 for date before first balance", () => {
+    assert.equal(computeMarginLoan(LOAN, "2025-05-31"), 0);
+  });
+
+  it("returns -amount for date on a balance entry", () => {
+    assert.equal(computeMarginLoan(LOAN, "2025-06-01"), -50000);
+  });
+
+  it("returns -amount of most recent entry for date between balances", () => {
+    assert.equal(computeMarginLoan(LOAN, "2025-07-15"), -50000);
+  });
+
+  it("returns -lastAmount for date after last balance", () => {
+    assert.equal(computeMarginLoan(LOAN, "2026-01-01"), -30000);
+  });
+
+  it("handles single balance entry", () => {
+    const single = {
+      type: "margin_loan",
+      name: "Loan",
+      balances: [{ date: "2025-03-01", amount: "10000" }],
+    };
+    assert.equal(computeMarginLoan(single, "2025-02-28"), 0);
+    assert.equal(computeMarginLoan(single, "2025-03-01"), -10000);
+    assert.equal(computeMarginLoan(single, "2025-12-01"), -10000);
+  });
+
+  it("handles unsorted balances (sorts by date internally)", () => {
+    const unsorted = {
+      type: "margin_loan",
+      name: "Loan",
+      balances: [
+        { date: "2025-09-01", amount: "30000" },
+        { date: "2025-06-01", amount: "50000" },
+      ],
+    };
+    assert.equal(computeMarginLoan(unsorted, "2025-07-15"), -50000);
+    assert.equal(computeMarginLoan(unsorted, "2025-10-01"), -30000);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // mergeAssets
 // ---------------------------------------------------------------------------
 
@@ -286,6 +341,39 @@ describe("mergeAssets", () => {
     mergeAssets(data, [ibond], MARKET);
     assert.ok(data.chartData.length > 0);
     assert.ok(data.chartData[0].date >= "2022-01-01");
+  });
+
+  it("margin_loan produces negative values and sets liabilitySymbols", () => {
+    const chartData = [
+      { date: "2025-07-01", prices: {}, values: { VTI: 10000 }, cumulative: [10000], total: 10000 },
+    ];
+    const data = { symbols: ["VTI"], chartData, yMax: 10000 };
+    const loan = {
+      type: "margin_loan",
+      name: "Margin Loan",
+      balances: [{ date: "2025-06-01", amount: "5000" }],
+    };
+    mergeAssets(data, [loan], MARKET);
+    assert.equal(data.chartData[0].values["Margin Loan"], -5000);
+    assert.deepEqual(data.liabilitySymbols, ["Margin Loan"]);
+  });
+
+  it("liabilitySymbols is empty when no margin loans", () => {
+    const chartData = [
+      { date: "2022-07-05", prices: {}, values: {}, cumulative: [], total: 0 },
+    ];
+    const data = { symbols: [], chartData, yMax: 1 };
+    const mortgage = {
+      type: "mortgage",
+      name: "Home Equity",
+      purchaseDate: "2020-01-01",
+      homeValue: "500000",
+      downPayment: "100000",
+      loanTermYears: "30",
+      annualRate: "0.04",
+    };
+    mergeAssets(data, [mortgage], MARKET);
+    assert.ok(!data.liabilitySymbols || data.liabilitySymbols.length === 0);
   });
 
   it("rebuilds cumulative totals after adding assets", () => {

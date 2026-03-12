@@ -124,6 +124,21 @@
     return numUnits * unitValue;
   };
 
+  exports.computeMarginLoan = function computeMarginLoan(asset, dateStr) {
+    var balances = (asset.balances || []).slice().sort(function (a, b) {
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    });
+    var result = 0;
+    for (var i = 0; i < balances.length; i++) {
+      if (balances[i].date <= dateStr) {
+        result = -parseFloat(balances[i].amount);
+      } else {
+        break;
+      }
+    }
+    return result;
+  };
+
   exports.mergeAssets = function mergeAssets(data, assets, market) {
     if (!Array.isArray(assets) || assets.length === 0) return;
 
@@ -156,6 +171,8 @@
 
     var computeMortgageEquity = exports.computeMortgageEquity;
     var computeIBondValue = exports.computeIBondValue;
+    var computeMarginLoan = exports.computeMarginLoan;
+    var liabilityNames = [];
 
     for (var ai = 0; ai < assets.length; ai++) {
       var asset = assets[ai];
@@ -169,11 +186,18 @@
           val = computeMortgageEquity(asset, cd.date);
         } else if (asset.type === "ibond") {
           val = computeIBondValue(asset, cd.date);
+        } else if (asset.type === "margin_loan") {
+          val = computeMarginLoan(asset, cd.date);
         }
         cd.values[name] = val;
       }
+
+      if (asset.type === "margin_loan") {
+        liabilityNames.push(name);
+      }
     }
 
+    data.liabilitySymbols = liabilityNames;
     rebuildCumulatives(data);
   };
 
