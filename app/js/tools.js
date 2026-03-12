@@ -121,7 +121,6 @@
    * @param {object} [options]        - optional config
    *   options.tradeable {string[]}   - if set, only these symbols get impliedTarget/buySell;
    *                                    other mapped symbols get null for those fields
-   *   options.exclude   {string[]}   - symbols to omit entirely from tickers output
    * @returns {{ portfolioTotal, categories, tickers }}
    *
    * categories: [{ name, currentValue, currentPct, targetPct, targetValue, buySell }]
@@ -130,7 +129,6 @@
    */
   function computeRebalancing(fullData, exposureMap, rebalCats, targets, options) {
     var tradeable = (options && Array.isArray(options.tradeable)) ? options.tradeable : null;
-    var exclude = (options && Array.isArray(options.exclude)) ? options.exclude : [];
 
     if (!fullData || !fullData.chartData || fullData.chartData.length === 0) {
       return { portfolioTotal: 0, categories: [], tickers: [] };
@@ -177,18 +175,10 @@
 
     // Build ticker objects
     var tickers = (fullData.symbols || []).map(function (symbol) {
-      // Excluded symbols are dropped entirely
-      if (exclude.indexOf(symbol) !== -1) {
-        return null;
-      }
+      if (!exposureMap[symbol]) return null; // only show mapped symbols
 
       var currentValue = values[symbol] || 0;
       var currentPct = portfolioTotal > 0 ? (currentValue / portfolioTotal) * 100 : 0;
-
-      if (!exposureMap[symbol]) {
-        return { symbol: symbol, currentValue: currentValue, currentPct: currentPct,
-                 impliedTarget: null, buySell: null };
-      }
 
       // Non-tradeable mapped symbols: include in output but suppress buy/sell guidance
       if (tradeable !== null && tradeable.indexOf(symbol) === -1) {
@@ -254,7 +244,7 @@
    * @param {Array}        rebalCats       - [{ name, category? subcategories? }]
    * @param {object}       targets         - { categoryName: percentage (number) }
    * @param {number}       amount          - dollar amount to contribute (negative to withdraw)
-   * @param {object}       [options]       - optional config (tradeable, exclude)
+   * @param {object}       [options]       - optional config (tradeable)
    * @returns {{ portfolioTotal, newTotal, categories, tickers }}
    *
    * categories: [{ name, currentValue, currentPct, targetPct, contribution }]
@@ -263,7 +253,6 @@
    */
   function computeContributions(fullData, exposureMap, rebalCats, targets, amount, options) {
     var tradeable = (options && Array.isArray(options.tradeable)) ? options.tradeable : null;
-    var exclude = (options && Array.isArray(options.exclude)) ? options.exclude : [];
 
     if (!fullData || !fullData.chartData || fullData.chartData.length === 0) {
       return { portfolioTotal: 0, newTotal: Math.max(0, amount), categories: [], tickers: [] };
@@ -316,7 +305,6 @@
     var impliedTargetMap = {};
     var deltas = {};
     tradeableSyms.forEach(function (sym) {
-      if (exclude.indexOf(sym) !== -1) return;
       var currentValue = values[sym] || 0;
       var impliedTarget;
       if (greedyResult.sized[sym]) {
@@ -362,10 +350,8 @@
       var totalCurrent = 0;
       var eligibleSyms = [];
       tradeableSyms.forEach(function (sym) {
-        if (exclude.indexOf(sym) === -1) {
-          totalCurrent += values[sym] || 0;
-          eligibleSyms.push(sym);
-        }
+        totalCurrent += values[sym] || 0;
+        eligibleSyms.push(sym);
       });
       eligibleSyms.forEach(function (sym) {
         var w = totalCurrent > 0 ? (values[sym] || 0) / totalCurrent : 1 / eligibleSyms.length;
@@ -375,14 +361,10 @@
 
     // Build ticker output
     var tickers = (fullData.symbols || []).map(function (symbol) {
-      if (exclude.indexOf(symbol) !== -1) return null;
+      if (!exposureMap[symbol]) return null; // only show mapped symbols
       var currentValue = values[symbol] || 0;
       var currentPct = portfolioTotal > 0 ? (currentValue / portfolioTotal) * 100 : 0;
 
-      if (!exposureMap[symbol]) {
-        return { symbol: symbol, currentValue: currentValue, currentPct: currentPct,
-                 impliedTarget: null, contribution: null };
-      }
       if (tradeable !== null && tradeable.indexOf(symbol) === -1) {
         return { symbol: symbol, currentValue: currentValue, currentPct: currentPct,
                  impliedTarget: null, contribution: null };
@@ -594,7 +576,6 @@
 
       var result = computeRebalancing(fullData, exposureMap, cats, liveTargets, {
         tradeable: rebalancingConfig.tradeable || null,
-        exclude: rebalancingConfig.exclude || [],
       });
       rebalOutputArea.innerHTML = "";
 
@@ -680,7 +661,6 @@
       var amount = parseFloat(amountInput.value) || 0;
       var result = computeContributions(fullData, exposureMap, cats, liveTargets, amount, {
         tradeable: rebalancingConfig.tradeable || null,
-        exclude: rebalancingConfig.exclude || [],
       });
       contribOutputArea.innerHTML = "";
 

@@ -23,7 +23,7 @@ var EXPOSURE_MAP = {};
 var EXPOSURE_DISPLAY = [];
 var SYMBOL_ORDER = [];
 var GAINS_METHOD = "FIFO";
-var REBALANCING_CONFIG = { categories: [], targets: {}, tradeable: null, exclude: [] };
+var REBALANCING_CONFIG = { categories: [], targets: {}, tradeable: null };
 var MARGIN_LOAN_DISPLAY = "proportional";
 var ANALYSIS_WINDOW = "1Y";
 var GAINS_WINDOW = "YTD";
@@ -89,9 +89,6 @@ async function loadConfig() {
       }
       if (Array.isArray(cfg.rebalancing.tradeable)) {
         REBALANCING_CONFIG.tradeable = cfg.rebalancing.tradeable;
-      }
-      if (Array.isArray(cfg.rebalancing.exclude)) {
-        REBALANCING_CONFIG.exclude = cfg.rebalancing.exclude;
       }
     }
     if (cfg.marginLoan && cfg.marginLoan.chartDisplay) {

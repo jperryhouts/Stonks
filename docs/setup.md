@@ -246,15 +246,7 @@ For assets with formula-driven values (mortgage equity, I-bonds), create `data/a
 ]
 ```
 
-These appear in the chart alongside your other holdings. You may want to exclude them from rebalancing since they're not liquid:
-
-```json
-{
-  "rebalancing": {
-    "exclude": ["Home Equity"]
-  }
-}
-```
+These appear in the chart alongside your other holdings. The rebalancing tool only shows symbols that have entries in `exposure.allocations`, so illiquid assets like home equity are automatically absent from rebalancing even if they appear in the chart.
 
 See [Deterministic Assets](assets.md) for mortgage and I-bond configuration details.
 

@@ -29,8 +29,7 @@
       "International Stock": "25",
       "Bonds": "20"
     },
-    "tradeable": ["NVDA", "VTI", "VXUS", "BND"],
-    "exclude": ["Home Equity"]
+    "tradeable": ["NVDA", "VTI", "VXUS", "BND"]
   },
   "exposure": {
     "allocations": [

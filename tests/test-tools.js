@@ -154,7 +154,7 @@ describe("computeRebalancing - per-ticker", () => {
     assert.ok(Math.abs(vti.buySell - 1000) < 0.01);
   });
 
-  it("unmapped symbol has null impliedTarget and null buySell", () => {
+  it("unmapped symbol is absent from tickers output", () => {
     var fullData = makeFullData({ VTI: 6000, HomeEquity: 200000 });
     var exposureMap = { VTI: { Stocks: 1.0 } };
     var rebalCats = [{ name: "Stocks", category: "Stocks" }];
@@ -162,9 +162,8 @@ describe("computeRebalancing - per-ticker", () => {
 
     var result = computeRebalancing(fullData, exposureMap, rebalCats, targets);
 
-    var home = result.tickers.find((t) => t.symbol === "HomeEquity");
-    assert.equal(home.impliedTarget, null);
-    assert.equal(home.buySell, null);
+    assert.ok(!result.tickers.find((t) => t.symbol === "HomeEquity"),
+      "unmapped symbol should not appear in tickers");
   });
 
   it("multi-category ticker: implied target is sum across categories", () => {
@@ -229,21 +228,20 @@ describe("computeRebalancing - edge cases", () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeRebalancing — tradeable and exclude options
+// computeRebalancing — tradeable option and unmapped symbol filtering
 // ---------------------------------------------------------------------------
 
-describe("computeRebalancing - tradeable and exclude options", () => {
-  it("excluded symbols are absent from tickers output", () => {
+describe("computeRebalancing - tradeable option and unmapped symbol filtering", () => {
+  it("unmapped symbols are absent from tickers output", () => {
     var fullData = makeFullData({ VTI: 6000, HomeEquity: 200000 });
     var exposureMap = { VTI: { Stocks: 1.0 } };
     var rebalCats = [{ name: "Stocks", category: "Stocks" }];
     var targets = { Stocks: 100 };
-    var options = { exclude: ["HomeEquity"] };
 
-    var result = computeRebalancing(fullData, exposureMap, rebalCats, targets, options);
+    var result = computeRebalancing(fullData, exposureMap, rebalCats, targets);
 
     assert.ok(!result.tickers.find(function(t) { return t.symbol === "HomeEquity"; }),
-      "HomeEquity should not appear in tickers");
+      "HomeEquity should not appear in tickers (not in exposureMap)");
     assert.ok(result.tickers.find(function(t) { return t.symbol === "VTI"; }),
       "VTI should still appear");
   });
@@ -280,25 +278,25 @@ describe("computeRebalancing - tradeable and exclude options", () => {
     assert.ok(Math.abs(vti.buySell - (-2000)) < 0.01);
   });
 
-  it("exclude and tradeable options work together", () => {
+  it("unmapped symbols are excluded even when tradeable option is set", () => {
     var fullData = makeFullData({ VTI: 6000, "401k": 3000, HomeEquity: 200000 });
     var exposureMap = { VTI: { Stocks: 1.0 }, "401k": { Stocks: 1.0 } };
     var rebalCats = [{ name: "Stocks", category: "Stocks" }];
     var targets = { Stocks: 100 };
-    var options = { tradeable: ["VTI"], exclude: ["HomeEquity"] };
+    var options = { tradeable: ["VTI"] };
 
     var result = computeRebalancing(fullData, exposureMap, rebalCats, targets, options);
 
     assert.ok(!result.tickers.find(function(t) { return t.symbol === "HomeEquity"; }),
-      "HomeEquity should be excluded");
+      "HomeEquity should not appear (not in exposureMap)");
     var acct = result.tickers.find(function(t) { return t.symbol === "401k"; });
     assert.equal(acct.impliedTarget, null, "401k is not tradeable, should have null impliedTarget");
     var vti = result.tickers.find(function(t) { return t.symbol === "VTI"; });
     assert.ok(vti.impliedTarget !== null, "VTI is tradeable, should have impliedTarget");
   });
 
-  it("without options argument, existing behavior is unchanged", () => {
-    // Backward compat: no options means all EXPOSURE_MAP symbols get buy/sell
+  it("without options argument, all exposure map symbols get buy/sell", () => {
+    // No options means all exposureMap symbols get buy/sell
     var fullData = makeFullData({ VTI: 6000, BND: 4000 });
     var exposureMap = { VTI: { Stocks: 1.0 }, BND: { Bonds: 1.0 } };
     var rebalCats = [

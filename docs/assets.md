@@ -181,14 +181,4 @@ Deterministic assets participate in the exposure system like any other symbol. A
 { "symbol": "I-Bond", "category": "Bonds", "fraction": "1.0" }
 ```
 
-You might want to **exclude** the mortgage from rebalancing calculations (it's not something you can buy or sell to rebalance):
-
-```json
-{
-  "rebalancing": {
-    "exclude": ["Home Equity"]
-  }
-}
-```
-
-This keeps Home Equity visible in the chart and Analysis tab but omits it from the rebalancing target calculations.
+If you don't add an `exposure.allocations` entry for a deterministic asset, it will appear in the chart and Analysis tab but not in the rebalancing tool — which is usually the right behavior for illiquid assets like home equity that you can't trade to rebalance.
