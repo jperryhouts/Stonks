@@ -233,6 +233,41 @@ main { line-height: 1.5; }
     font-weight: 600;
 }
 
+/* Columns with $0 current value — hidden by default, revealed on expand */
+#history-table .zero-col {
+    display: none;
+}
+#history-table.expanded .zero-col {
+    display: table-cell;
+}
+
+/* Narrow expand/collapse column */
+#history-table th.history-expand-col,
+#history-table td.history-expand-col {
+    width: 1.6rem;
+    min-width: 1.6rem;
+    max-width: 1.6rem;
+    padding: 0.1rem 0.25rem !important;
+    text-align: center !important;
+}
+
+.history-expand-btn {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    color: #888;
+    padding: 0.05rem 0.3rem;
+    line-height: 1.4;
+    font-family: inherit;
+}
+.history-expand-btn:hover {
+    background: #f0f0f0;
+    border-color: #999;
+    color: #444;
+}
+
 .history-cell-popup {
     position: fixed;
     z-index: 9999;

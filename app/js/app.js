@@ -702,18 +702,65 @@ function buildHistoryTable(data, retirement, rebuildAll) {
     }
   }
 
+  // Split symbols into active (current value > 0) vs zero (currently $0, collapsed by default)
+  var latestPt = cd.length > 0 ? cd[cd.length - 1] : null;
+  var activeSymbols = [], zeroSymbols = [];
+  for (var si = 0; si < symbols.length; si++) {
+    if (latestPt && (latestPt.values[symbols[si]] || 0) === 0) {
+      zeroSymbols.push(symbols[si]);
+    } else {
+      activeSymbols.push(symbols[si]);
+    }
+  }
+  var hasZeroCols = zeroSymbols.length > 0;
+
   var table = document.createElement("table");
   table.id = "history-table";
 
   // Header
   var thead = document.createElement("thead");
   var headerRow = document.createElement("tr");
-  var headers = ["Date"].concat(symbols).concat(["Total"]);
-  for (var i = 0; i < headers.length; i++) {
+
+  var thDate = document.createElement("th");
+  thDate.textContent = "Date";
+  headerRow.appendChild(thDate);
+
+  for (var i = 0; i < activeSymbols.length; i++) {
     var th = document.createElement("th");
-    th.textContent = headers[i];
+    th.textContent = activeSymbols[i];
     headerRow.appendChild(th);
   }
+
+  if (hasZeroCols) {
+    var thExpand = document.createElement("th");
+    thExpand.className = "history-expand-col";
+    var expandBtn = document.createElement("button");
+    expandBtn.className = "history-expand-btn";
+    expandBtn.textContent = "+";
+    expandBtn.title = "Show columns with $0 current value: " + zeroSymbols.join(", ");
+    expandBtn.addEventListener("click", function () {
+      var expanding = !table.classList.contains("expanded");
+      table.classList.toggle("expanded");
+      expandBtn.textContent = expanding ? "−" : "+";
+      expandBtn.title = expanding
+        ? "Hide columns with $0 current value"
+        : "Show columns with $0 current value: " + zeroSymbols.join(", ");
+    });
+    thExpand.appendChild(expandBtn);
+    headerRow.appendChild(thExpand);
+
+    for (var i2 = 0; i2 < zeroSymbols.length; i2++) {
+      var thZ = document.createElement("th");
+      thZ.textContent = zeroSymbols[i2];
+      thZ.className = "zero-col";
+      headerRow.appendChild(thZ);
+    }
+  }
+
+  var thTotal = document.createElement("th");
+  thTotal.textContent = "Total";
+  headerRow.appendChild(thTotal);
+
   thead.appendChild(headerRow);
   table.appendChild(thead);
 
@@ -729,8 +776,8 @@ function buildHistoryTable(data, retirement, rebuildAll) {
     tdDate.textContent = rowDate;
     tr.appendChild(tdDate);
 
-    for (var k = 0; k < symbols.length; k++) {
-      var sym = symbols[k];
+    for (var k = 0; k < activeSymbols.length; k++) {
+      var sym = activeSymbols[k];
       var val = pt.values[sym] || 0;
       var td = document.createElement("td");
       if (retirementSet[sym] && !acctHasAnyValues[sym]) {
@@ -751,6 +798,37 @@ function buildHistoryTable(data, retirement, rebuildAll) {
         _histAttachEditHandler(td, rowDate, sym, retirement, rebuildAll, val);
       }
       tr.appendChild(td);
+    }
+
+    if (hasZeroCols) {
+      var tdPlaceholder = document.createElement("td");
+      tdPlaceholder.className = "history-expand-col";
+      tr.appendChild(tdPlaceholder);
+
+      for (var m = 0; m < zeroSymbols.length; m++) {
+        var symZ = zeroSymbols[m];
+        var valZ = pt.values[symZ] || 0;
+        var tdZ = document.createElement("td");
+        tdZ.className = "zero-col";
+        if (retirementSet[symZ] && !acctHasAnyValues[symZ]) {
+          tdZ.textContent = "—";
+          tdZ.style.color = "#9ca3af";
+          tdZ.title = "No ground-truth values recorded yet — double-click to add one";
+        } else {
+          tdZ.textContent = fmtDollar(valZ);
+          if (retirementSet[symZ] && gtSet[rowDate + ":" + symZ]) {
+            tdZ.style.fontWeight = "bold";
+          }
+          if (prev !== null) {
+            var prevValZ = prev.values[symZ] || 0;
+            historyColorCell(tdZ, valZ, prevValZ);
+          }
+        }
+        if (retirementSet[symZ] && retirement) {
+          _histAttachEditHandler(tdZ, rowDate, symZ, retirement, rebuildAll, valZ);
+        }
+        tr.appendChild(tdZ);
+      }
     }
 
     var tdTotal = document.createElement("td");
