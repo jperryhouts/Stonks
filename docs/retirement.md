@@ -118,9 +118,13 @@ Once interpolated, retirement account values are treated like any other symbol:
    { "date": "2025-01-01", "account": "HSA", "value": "5000" }
    ```
 
-3. Add allocation entries to `config.json` so the account appears in the Analysis tab:
+3. Add an allocation entry to `config.json` so the account appears in the Analysis tab:
    ```json
-   { "symbol": "HSA", "category": "Domestic (ex-NVDA)", "fraction": "1.0" }
+   "exposure": {
+     "allocations": {
+       "HSA": { "Domestic (ex-NVDA)": 1.0 }
+     }
+   }
    ```
 
 4. Optionally add it to `symbolOrder` to control its position in the chart stack.

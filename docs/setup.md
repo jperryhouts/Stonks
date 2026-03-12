@@ -98,11 +98,11 @@ At minimum, the `config.json` needs an `exposure` section:
 ```json
 {
   "exposure": {
-    "allocations": [
-      { "symbol": "VTI",  "category": "US Stock",      "fraction": "1.0" },
-      { "symbol": "VXUS", "category": "International",  "fraction": "1.0" },
-      { "symbol": "BND",  "category": "Bonds",          "fraction": "1.0" }
-    ],
+    "allocations": {
+      "VTI":  { "US Stock": 1.0 },
+      "VXUS": { "International": 1.0 },
+      "BND":  { "Bonds": 1.0 }
+    },
     "display": [
       { "name": "US Stock",      "color": "#3b82f6", "category": "US Stock" },
       { "name": "International", "color": "#f59e0b", "category": "International" },
@@ -112,7 +112,7 @@ At minimum, the `config.json` needs an `exposure` section:
 }
 ```
 
-- **`allocations`**: maps each symbol to a category with a fraction. Fractions for a given symbol must sum to 1.0.
+- **`allocations`**: maps each symbol to its categories. Each key is a ticker symbol, and each value is an object mapping category names to fractions. Fractions for a given symbol must sum to 1.0.
 - **`display`**: defines the rows shown in the Analysis tab. Each entry has a name, color (for the donut chart), and the category it represents.
 
 This is enough to get started. The Analysis tab will show a pie chart and table breaking down your portfolio by these categories.
@@ -124,17 +124,16 @@ If you hold both an index fund and an individual stock that's a component of tha
 ```json
 {
   "exposure": {
-    "allocations": [
-      { "symbol": "NVDA", "category": "NVDA",         "fraction": "1.0" },
-      { "symbol": "VTI",  "category": "NVDA",         "fraction": "0.067" },
-      { "symbol": "VTI",  "category": "US (ex-NVDA)", "fraction": "0.933" },
-      { "symbol": "VXUS", "category": "International", "fraction": "1.0" },
-      { "symbol": "BND",  "category": "Bonds",         "fraction": "1.0" }
-    ],
+    "allocations": {
+      "NVDA": { "NVDA": 1.0 },
+      "VTI":  { "NVDA": 0.067, "US (ex-NVDA)": 0.933 },
+      "VXUS": { "International": 1.0 },
+      "BND":  { "Bonds": 1.0 }
+    },
     "display": [
       { "name": "US Stock",      "color": "#3b82f6", "subcategories": "NVDA, US (ex-NVDA)" },
-      { "name": "NVDA",          "color": "#76b900", "indent": "true", "category": "NVDA" },
-      { "name": "Non-NVDA",      "color": "#6366f1", "indent": "true", "category": "US (ex-NVDA)" },
+      { "name": "NVDA",          "color": "#76b900", "indent": true, "category": "NVDA" },
+      { "name": "Non-NVDA",      "color": "#6366f1", "indent": true, "category": "US (ex-NVDA)" },
       { "name": "International", "color": "#f59e0b", "category": "International" },
       { "name": "Bonds",         "color": "#14b8a6", "category": "Bonds" }
     ]
@@ -146,27 +145,27 @@ Now VTI is split: 6.7% of its value counts toward NVDA, and the Analysis tab sho
 
 ### Rebalancing targets (optional)
 
-Add a `rebalancing` section to enable the Tools tab calculator:
+To enable the Tools tab rebalancing calculator, add `target` fields to the display rows you want to rebalance against, and a `tradeable` array listing which symbols can be bought/sold:
 
 ```json
 {
-  "rebalancing": {
-    "categories": [
-      { "name": "US Stock",      "category": "US Stock" },
-      { "name": "International", "category": "International" },
-      { "name": "Bonds",         "category": "Bonds" }
-    ],
-    "targets": {
-      "US Stock": "60",
-      "International": "25",
-      "Bonds": "15"
+  "exposure": {
+    "allocations": {
+      "VTI":  { "US Stock": 1.0 },
+      "VXUS": { "International": 1.0 },
+      "BND":  { "Bonds": 1.0 }
     },
+    "display": [
+      { "name": "US Stock",      "color": "#3b82f6", "category": "US Stock",      "target": 60 },
+      { "name": "International", "color": "#f59e0b", "category": "International", "target": 25 },
+      { "name": "Bonds",         "color": "#14b8a6", "category": "Bonds",         "target": 15 }
+    ],
     "tradeable": ["VTI", "VXUS", "BND"]
   }
 }
 ```
 
-Target percentages should sum to 100. The `tradeable` array lists symbols the rebalancing calculator is allowed to suggest buying or selling.
+Target percentages should sum to 100. Only display rows with a `target` field participate in rebalancing — rows without it (like group/summary rows) are ignored. The `tradeable` array lists symbols the rebalancing calculator is allowed to suggest buying or selling.
 
 ### Other config options
 
@@ -219,7 +218,7 @@ Ground-truth `values` entries are optional but improve accuracy — they correct
 > **Important:** You also need to add an allocation entry in `config.json` for each retirement account. Without it the account will appear in the Overview and History tabs but will be **excluded from the Analysis tab** and the rebalancing calculator.
 
 ```json
-{ "symbol": "401k", "category": "US Stock", "fraction": "1.0" }
+"401k": { "US Stock": 1.0 }
 ```
 
 > **Proxy tickers:** Only exchange-listed ETF tickers work as proxies — mutual fund tickers like `FXAIX` or `VTSAX` are not supported by the price fetcher. Use an equivalent ETF instead (e.g. `SPY` or `VOO` in place of FXAIX, `VTI` in place of VTSAX).

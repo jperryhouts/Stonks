@@ -177,8 +177,12 @@ This gives a smooth daily value rather than a step function that only changes ev
 Deterministic assets participate in the exposure system like any other symbol. Add allocation entries to `config.json`:
 
 ```json
-{ "symbol": "Home Equity", "category": "Real Estate", "fraction": "1.0" },
-{ "symbol": "I-Bond", "category": "Bonds", "fraction": "1.0" }
+"exposure": {
+  "allocations": {
+    "Home Equity": { "Real Estate": 1.0 },
+    "I-Bond": { "Bonds": 1.0 }
+  }
+}
 ```
 
 If you don't add an `exposure.allocations` entry for a deterministic asset, it will appear in the chart and Analysis tab but not in the rebalancing tool — which is usually the right behavior for illiquid assets like home equity that you can't trade to rebalance.

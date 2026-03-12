@@ -8,18 +8,17 @@ This matters for concentration risk. If you're running a portfolio with a handfu
 
 ## How it works
 
-Every symbol in your portfolio maps to one or more **categories** via the `exposure.allocations` array in `config.json`. Each mapping has a `fraction` — the portion of that symbol's value attributed to the category. Fractions for a given symbol must sum to 1.0.
+Every symbol in your portfolio maps to one or more **categories** via `exposure.allocations` in `config.json`. Each symbol maps to an object of `{ category: fraction }` pairs — the fraction is the portion of that symbol's value attributed to the category. Fractions for a given symbol must sum to 1.0.
 
 ```json
 {
   "exposure": {
-    "allocations": [
-      { "symbol": "NVDA", "category": "NVDA", "fraction": "1.0" },
-      { "symbol": "VTI",  "category": "NVDA", "fraction": "0.067" },
-      { "symbol": "VTI",  "category": "Domestic (ex-NVDA)", "fraction": "0.933" },
-      { "symbol": "VXUS", "category": "International", "fraction": "1.0" },
-      { "symbol": "BND",  "category": "Bonds", "fraction": "1.0" }
-    ]
+    "allocations": {
+      "NVDA": { "NVDA": 1.0 },
+      "VTI":  { "NVDA": 0.067, "Domestic (ex-NVDA)": 0.933 },
+      "VXUS": { "International": 1.0 },
+      "BND":  { "Bonds": 1.0 }
+    }
   }
 }
 ```
@@ -63,9 +62,7 @@ So your true NVDA exposure is $955 / $11,538 = **8.3%**, even though direct NVDA
 The same allocation system applies to retirement accounts and deterministic assets. A 401k invested in a target-date fund with known allocations can be split across categories:
 
 ```json
-{ "symbol": "401k", "category": "NVDA",              "fraction": "0.05025" },
-{ "symbol": "401k", "category": "Domestic (ex-NVDA)", "fraction": "0.69975" },
-{ "symbol": "401k", "category": "International",      "fraction": "0.25" }
+"401k": { "NVDA": 0.05025, "Domestic (ex-NVDA)": 0.69975, "International": 0.25 }
 ```
 
 This 401k is treated as 75% domestic (with the domestic portion split the same way as VTI: 6.7% NVDA, 93.3% non-NVDA) and 25% international. Its interpolated daily value (see [Retirement Accounts](retirement.md)) gets split across those categories, so the Analysis tab reflects your total exposure across all accounts.
@@ -73,7 +70,7 @@ This 401k is treated as 75% domestic (with the domestic portion split the same w
 An I-bond maps entirely to bonds:
 
 ```json
-{ "symbol": "I-Bond", "category": "Bonds", "fraction": "1.0" }
+"I-Bond": { "Bonds": 1.0 }
 ```
 
 ## Display configuration
@@ -84,8 +81,8 @@ The `exposure.display` array controls what rows appear in the Analysis tab table
 {
   "display": [
     { "name": "Domestic Stock", "color": "#3b82f6", "subcategories": "NVDA, Domestic (ex-NVDA)" },
-    { "name": "NVDA",           "color": "#76b900", "indent": "true", "category": "NVDA" },
-    { "name": "Non-NVDA",       "color": "#6366f1", "indent": "true", "category": "Domestic (ex-NVDA)" },
+    { "name": "NVDA",           "color": "#76b900", "indent": true, "category": "NVDA" },
+    { "name": "Non-NVDA",       "color": "#6366f1", "indent": true, "category": "Domestic (ex-NVDA)" },
     { "name": "International Stock", "color": "#f59e0b", "category": "International" },
     { "name": "Bonds",          "color": "#14b8a6", "category": "Bonds" }
   ]
@@ -96,32 +93,30 @@ The `exposure.display` array controls what rows appear in the Analysis tab table
 - **`subcategories`**: comma-separated list of categories to sum. Used for group rows that aggregate child rows.
 - **`indent`**: renders the row as a sub-row under the preceding group.
 - **`color`**: used in the donut chart.
+- **`target`**: (optional) rebalancing target percentage for this category. Display rows with `target` set define the rebalancing categories — see below.
 
 This gives you a hierarchical view: "Domestic Stock" is the sum of NVDA + Non-NVDA, with the two subcategories shown indented beneath it.
 
 ## Rebalancing integration
 
-The rebalancing tool (Tools tab) consumes the same category structure. Its `rebalancing.categories` array maps display categories to exposure categories, and `rebalancing.targets` sets the desired percentage for each:
+The rebalancing tool (Tools tab) derives its categories directly from display rows that have a `target` field. Add `target` (a percentage) to the display rows you want to rebalance against, and add a `tradeable` array to `exposure`:
 
 ```json
 {
-  "rebalancing": {
-    "categories": [
-      { "name": "NVDA", "subcategories": "NVDA" },
-      { "name": "Domestic (Ex-NVDA)", "subcategories": "Domestic (ex-NVDA)" },
-      { "name": "International Stock", "category": "International" },
-      { "name": "Bonds", "category": "Bonds" }
+  "exposure": {
+    "display": [
+      { "name": "Domestic Stock", "color": "#3b82f6", "subcategories": "NVDA, Domestic (ex-NVDA)" },
+      { "name": "NVDA",           "color": "#76b900", "indent": true, "category": "NVDA", "target": 10 },
+      { "name": "Non-NVDA",       "color": "#6366f1", "indent": true, "category": "Domestic (ex-NVDA)", "target": 45 },
+      { "name": "International Stock", "color": "#f59e0b", "category": "International", "target": 25 },
+      { "name": "Bonds",          "color": "#14b8a6", "category": "Bonds", "target": 20 }
     ],
-    "targets": {
-      "NVDA": "10",
-      "Domestic (Ex-NVDA)": "45",
-      "International Stock": "25",
-      "Bonds": "20"
-    },
     "tradeable": ["NVDA", "VTI", "VXUS", "BND"]
   }
 }
 ```
+
+Target percentages should sum to 100. Only display rows with `target` participate in rebalancing — the "Domestic Stock" group row above has no target, so it's just a display grouping.
 
 When you ask "how should I rebalance?", the tool computes the difference between current exposure (using the fractional allocations) and the target percentages, then solves for which tradeable symbols to buy or sell. Because VTI contributes to both the NVDA and Domestic categories, selling VTI affects both — the solver accounts for this.
 
@@ -129,6 +124,6 @@ When you ask "how should I rebalance?", the tool computes the difference between
 
 When you add a new ticker to your portfolio:
 
-1. Add allocation entries in `config.json` — fractions for the new symbol must sum to 1.0
+1. Add an allocation entry in `config.json` — fractions for the new symbol must sum to 1.0
 2. If it belongs to an existing category, you're done
-3. If it's a new category, add a `display` entry and optionally a `rebalancing.categories` entry with a target
+3. If it's a new category, add a `display` entry (optionally with a `target` for rebalancing)

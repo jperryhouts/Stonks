@@ -49,6 +49,9 @@ async function fetchJSON(url) {
   return res.json();
 }
 
+// Config parser — loaded from js/config.js via Portfolio namespace
+var parseConfig = Portfolio.parseConfig;
+
 /**
  * Load data/config.json and apply to globals. Failures are non-fatal (defaults remain).
  * Structure: { colors: [...], exposure: { allocations: [...], display: [...] } }
@@ -57,49 +60,14 @@ async function loadConfig() {
   try {
     var cfg = await fetchJSON("data/config.json").catch(function () { return null; });
     if (!cfg) return;
-    if (Array.isArray(cfg.colors) && cfg.colors.length > 0) {
-      COLORS = cfg.colors;
-    }
-    if (cfg.exposure) {
-      var allocs = cfg.exposure.allocations;
-      if (Array.isArray(allocs)) {
-        var map = {};
-        for (var i = 0; i < allocs.length; i++) {
-          var a = allocs[i];
-          if (!map[a.symbol]) map[a.symbol] = {};
-          map[a.symbol][a.category] = parseFloat(a.fraction);
-        }
-        if (Object.keys(map).length > 0) EXPOSURE_MAP = map;
-      }
-      if (Array.isArray(cfg.exposure.display) && cfg.exposure.display.length > 0) {
-        EXPOSURE_DISPLAY = cfg.exposure.display;
-      }
-    }
-    if (Array.isArray(cfg.symbolOrder)) SYMBOL_ORDER = cfg.symbolOrder;
-    if (cfg.capitalGains && cfg.capitalGains.method) GAINS_METHOD = cfg.capitalGains.method;
-    if (cfg.rebalancing) {
-      if (Array.isArray(cfg.rebalancing.categories)) {
-        REBALANCING_CONFIG.categories = cfg.rebalancing.categories;
-      }
-      if (cfg.rebalancing.targets && typeof cfg.rebalancing.targets === "object") {
-        var rawTargets = cfg.rebalancing.targets;
-        var parsedTargets = {};
-        for (var tk in rawTargets) parsedTargets[tk] = parseFloat(rawTargets[tk]);
-        REBALANCING_CONFIG.targets = parsedTargets;
-      }
-      if (Array.isArray(cfg.rebalancing.tradeable)) {
-        REBALANCING_CONFIG.tradeable = cfg.rebalancing.tradeable;
-      }
-    }
-    if (cfg.marginLoan && cfg.marginLoan.chartDisplay) {
-      var mode = cfg.marginLoan.chartDisplay;
-      if (mode === "proportional") {
-        MARGIN_LOAN_DISPLAY = mode;
-      } else {
-        console.warn("Unimplemented margin loan display mode: " + mode + "; using proportional");
-        MARGIN_LOAN_DISPLAY = "proportional";
-      }
-    }
+    var parsed = parseConfig(cfg);
+    if (parsed.colors) COLORS = parsed.colors;
+    if (parsed.exposureMap) EXPOSURE_MAP = parsed.exposureMap;
+    if (parsed.exposureDisplay) EXPOSURE_DISPLAY = parsed.exposureDisplay;
+    if (parsed.symbolOrder) SYMBOL_ORDER = parsed.symbolOrder;
+    if (parsed.gainsMethod) GAINS_METHOD = parsed.gainsMethod;
+    if (parsed.rebalancingConfig) REBALANCING_CONFIG = parsed.rebalancingConfig;
+    if (parsed.marginLoanDisplay) MARGIN_LOAN_DISPLAY = parsed.marginLoanDisplay;
   } catch (e) {
     // Config load failure is non-fatal; defaults remain
   }
@@ -1311,7 +1279,7 @@ function buildExposurePanel(data, trades, retirement, assets) {
     rows.push({
       name: name,
       value: value,
-      indent: d.indent === "true",
+      indent: d.indent === true || d.indent === "true",
       group: !!d.subcategories,
     });
     barColors[name] = d.color || "#888";
