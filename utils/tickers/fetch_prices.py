@@ -225,12 +225,13 @@ def fetch_prices(
         log.error("yfinance returned an empty DataFrame")
         return "", {t: None for t in tickers}
 
-    trade_date = data.index[-1].strftime("%Y-%m-%d")
-
     # Build the timestamp: actual time for live session, 16:00 for closes.
+    # During REGULAR hours, use today_et for the date — yfinance's last row may
+    # still be yesterday's close, which would overwrite it with the wrong date.
     if market_state == "REGULAR":
-        timestamp = f"{trade_date} {now_et.strftime('%H:%M')}"
+        timestamp = f"{today_et} {now_et.strftime('%H:%M')}"
     else:
+        trade_date = data.index[-1].strftime("%Y-%m-%d")
         timestamp = f"{trade_date} 16:00"
 
     prices: dict[str, float | None] = {}
@@ -261,7 +262,9 @@ def fetch_historical_prices(
     """Fetch closing prices for each trading day in [start, end].
 
     Returns a list of (timestamp, prices) tuples sorted ascending by date,
-    one entry per trading day.  Timestamps use 16:00 ET (close).
+    one entry per trading day.  Timestamps use 16:00 ET (close), except for
+    today's entry during an active REGULAR session, which uses the current
+    ET time.
     """
     if not tickers:
         log.warning("No tickers provided")
@@ -270,6 +273,15 @@ def fetch_historical_prices(
     # yfinance end is exclusive, so add one day.
     yf_end = end + timedelta(days=1)
     log.info("Fetching historical prices from %s to %s", start, end)
+
+    now_et = datetime.now(_ET)
+    today_et = now_et.date()
+
+    # Only check market state when the range includes today — avoids an extra
+    # API call for purely historical fetches.
+    market_state = None
+    if end >= today_et:
+        market_state = _get_market_state(tickers[0])
 
     try:
         data = yf.download(tickers, start=start, end=yf_end, progress=False)
@@ -284,7 +296,10 @@ def fetch_historical_prices(
     results: list[tuple[str, dict[str, float | None]]] = []
     for idx in data.index:
         trade_date = idx.strftime("%Y-%m-%d")
-        timestamp = f"{trade_date} 16:00"
+        if idx.date() == today_et and market_state == "REGULAR":
+            timestamp = f"{trade_date} {now_et.strftime('%H:%M')}"
+        else:
+            timestamp = f"{trade_date} 16:00"
         prices: dict[str, float | None] = {}
         for ticker in tickers:
             try:
