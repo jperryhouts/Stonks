@@ -22,7 +22,6 @@ var COLORS = [
 var EXPOSURE_MAP = {};
 var EXPOSURE_DISPLAY = [];
 var SYMBOL_ORDER = [];
-var GAINS_METHOD = "FIFO";
 var REBALANCING_CONFIG = { categories: [], targets: {}, tradeable: null };
 var MARGIN_LOAN_DISPLAY = "proportional";
 var ANALYSIS_WINDOW = "1Y";
@@ -65,7 +64,6 @@ async function loadConfig() {
     if (parsed.exposureMap) EXPOSURE_MAP = parsed.exposureMap;
     if (parsed.exposureDisplay) EXPOSURE_DISPLAY = parsed.exposureDisplay;
     if (parsed.symbolOrder) SYMBOL_ORDER = parsed.symbolOrder;
-    if (parsed.gainsMethod) GAINS_METHOD = parsed.gainsMethod;
     if (parsed.rebalancingConfig) REBALANCING_CONFIG = parsed.rebalancingConfig;
     if (parsed.marginLoanDisplay) MARGIN_LOAN_DISPLAY = parsed.marginLoanDisplay;
   } catch (e) {
@@ -2193,7 +2191,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   mergeRetirement(fullData, retirement, market);
   mergeAssets(fullData, assets, market);
   applySymbolOrder(fullData, SYMBOL_ORDER);
-  var gainsData = computeGains(trades || [], market || [], GAINS_METHOD);
+  var gainsData = computeGains(trades || [], market || []);
   if (fullData.chartData.length < 2) {
     document.body.classList.remove("loading");
     document.getElementById("app").textContent = "Not enough data to display.";
@@ -2256,7 +2254,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         mergeRetirement(fullData, retirement, market);
         mergeAssets(fullData, assets, market);
         applySymbolOrder(fullData, SYMBOL_ORDER);
-        gainsData = computeGains(trades || [], market || [], GAINS_METHOD);
+        gainsData = computeGains(trades || [], market || []);
         if (fullData.chartData.length < 2) return;
         state.data = filterData(fullData, select.value);
         drawChart(chartRef, state.data, null);

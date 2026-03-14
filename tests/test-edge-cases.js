@@ -184,42 +184,6 @@ describe("computeGains — overselling", () => {
     assert.ok(totalShares <= 5, `should not realize more than 5 owned shares (got ${totalShares})`);
   });
 
-  it("average_cost: does not realize more shares than owned (TODO: currently does)", () => {
-    // TODO: Bug — the average_cost path uses the requested sell quantity directly
-    // without capping it against the current trades. Selling 10 when you own 5
-    // produces a realized entry with shares=10 and a gain double the correct amount.
-    // The correct behaviour is to either cap at 5 shares or emit a warning for excess.
-    const trades = [
-      buy("2024-01-01", "VTI", 100, 5),
-      sell("2024-06-01", "VTI", 150, 10), // only 5 available
-    ];
-    const m = mkt({ date: "2024-12-31", sym: "VTI", price: 150 });
-    const { realized } = computeGains(trades, m, "average_cost");
-    const totalShares = realized.reduce((s, r) => s + r.shares, 0);
-    assert.ok(
-      totalShares <= 5,
-      `average_cost should not realize more shares than owned (got ${totalShares})`
-    );
-  });
-
-  it("average_cost: LT gains appear in ltRealizedThisYear (TODO: all go to stRealizedThisYear)", () => {
-    // TODO: Bug — the average_cost summary unconditionally adds all current-year
-    // realized gains to stRealizedThisYear regardless of holding period.
-    // ltRealizedThisYear is always 0 under average_cost. Gains from lots held
-    // more than 365 days should be classified as long-term.
-    const year = new Date().getFullYear();
-    const buyYear = year - 2; // clearly long-term (held > 2 years)
-    const trades = [
-      buy(`${buyYear}-01-01`, "VTI", 100, 10),
-      sell(`${year}-06-01`, "VTI", 150, 5), // LT gain: 5 × $50 = $250
-    ];
-    const m = mkt({ date: `${year}-12-31`, sym: "VTI", price: 150 });
-    const { summary } = computeGains(trades, m, "average_cost");
-    assert.ok(
-      summary.ltRealizedThisYear > 0,
-      `LT gain of $250 should be in ltRealizedThisYear, got ${summary.ltRealizedThisYear} (ST: ${summary.stRealizedThisYear})`
-    );
-  });
 });
 
 // ---------------------------------------------------------------------------

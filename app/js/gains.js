@@ -6,20 +6,17 @@
    *
    * @param {Array}  trades - [{date, symbol, price, quantity, type?}] (all strings)
    * @param {Array}  market   - [{timestamp, ...prices}] from market.json
-   * @param {string} method   - "FIFO" (default) or "average_cost"
    * @returns {{ realized, donated, unrealized, summary }}
    *
    * realized entries: {date, symbol, shares, costBasis, proceeds, gain, holdDays, isLongTerm}
    * donated entries:  {date, symbol, shares, costBasis, fmv, fmvTotal, gain, holdDays, isLongTerm}
    *   fmv = per-share FMV (price field); fmvTotal = fmv*shares; gain = forgone gain (informational)
    * unrealized entries: {symbol, shares, avgCostBasis, currentPrice, currentValue, gain, isLongTerm,
-   *                       stShares, ltShares, stCost, ltCost, stGain, ltGain}  (FIFO only; absent for average_cost)
-   *   isLongTerm: true = all lots LT, false = all lots ST, null = mixed or n/a
+   *                       stShares, ltShares, stCost, ltCost, stGain, ltGain}
+   *   isLongTerm: true = all lots LT, false = all lots ST, null = mixed
    * summary: {stRealizedThisYear, ltRealizedThisYear, stUnrealized, ltUnrealized}
    */
-  function computeGains(trades, market, method) {
-    if (!method) method = "FIFO";
-
+  function computeGains(trades, market) {
     // Build last known price per symbol (iterate forward; later rows overwrite earlier ones)
     var lastPrices = {}; // symbol -> {price, date}
     for (var mi = 0; mi < market.length; mi++) {
@@ -40,113 +37,6 @@
     var thisYear = new Date().getFullYear().toString();
     var realized = [];
     var donated = [];
-
-    // -------------------------------------------------------------------------
-    // Average cost method
-    // -------------------------------------------------------------------------
-    if (method === "average_cost") {
-      var acShares = {}, acCost = {}, acEpoch = {};
-
-      for (var i = 0; i < sorted.length; i++) {
-        var tx = sorted[i];
-        var qty = parseFloat(tx.quantity);
-        if (tx.type === "buy" || tx.type === "drip") qty = Math.abs(qty);
-        else if (tx.type === "sell" || tx.type === "donate") qty = -Math.abs(qty);
-        var price = parseFloat(tx.price);
-        if (isNaN(qty) || isNaN(price) || qty === 0) continue;
-
-        var sym = tx.symbol;
-        if (!acShares[sym]) { acShares[sym] = 0; acCost[sym] = 0; acEpoch[sym] = 0; }
-
-        if (qty > 0) {
-          var epoch = new Date(tx.date).getTime();
-          var prevShares = acShares[sym];
-          acEpoch[sym] = prevShares === 0
-            ? epoch
-            : (acEpoch[sym] * prevShares + epoch * qty) / (prevShares + qty);
-          acShares[sym] += qty;
-          acCost[sym] += qty * price;
-        } else {
-          var soldQty = Math.min(-qty, acShares[sym]);
-          var avgCost = acShares[sym] > 0 ? acCost[sym] / acShares[sym] : 0;
-          var holdDays = acEpoch[sym]
-            ? Math.round((new Date(tx.date).getTime() - acEpoch[sym]) / 86400000)
-            : 0;
-          var costBasis = avgCost * soldQty;
-          if (tx.type === "donate") {
-            var fmvTotal = price * soldQty;
-            donated.push({
-              date: tx.date,
-              symbol: sym,
-              shares: soldQty,
-              costBasis: costBasis,
-              fmv: price,
-              fmvTotal: fmvTotal,
-              gain: fmvTotal - costBasis,
-              holdDays: holdDays,
-              isLongTerm: holdDays > 365,
-            });
-          } else {
-            var proceeds = price * soldQty;
-            realized.push({
-              date: tx.date,
-              symbol: sym,
-              shares: soldQty,
-              costBasis: costBasis,
-              proceeds: proceeds,
-              gain: proceeds - costBasis,
-              holdDays: holdDays,
-              isLongTerm: holdDays > 365,
-            });
-          }
-          var newShares = Math.max(0, acShares[sym] - soldQty);
-          acCost[sym] = newShares * avgCost;
-          acShares[sym] = newShares;
-        }
-      }
-
-      var unrealized = [];
-      for (var usym in acShares) {
-        var ushares = acShares[usym];
-        if (ushares < 1e-6) continue;
-        var lastInfo = lastPrices[usym];
-        var currentPrice = lastInfo ? lastInfo.price : 0;
-        var currentValue = currentPrice * ushares;
-        unrealized.push({
-          symbol: usym,
-          shares: ushares,
-          avgCostBasis: acCost[usym] / ushares,
-          currentPrice: currentPrice,
-          currentValue: currentValue,
-          gain: currentValue - acCost[usym],
-          isLongTerm: null,
-        });
-      }
-
-      var stRealizedThisYear = 0, ltRealizedThisYear = 0;
-      for (var ri = 0; ri < realized.length; ri++) {
-        if (realized[ri].date.slice(0, 4) === thisYear) {
-          if (realized[ri].isLongTerm) ltRealizedThisYear += realized[ri].gain;
-          else stRealizedThisYear += realized[ri].gain;
-        }
-      }
-      var stUnrealized = 0, ltUnrealized = 0;
-      for (var ui = 0; ui < unrealized.length; ui++) {
-        stUnrealized += unrealized[ui].gain;
-      }
-
-      return {
-        realized: realized,
-        donated: donated,
-        unrealized: unrealized,
-        summary: {
-          stRealizedThisYear: stRealizedThisYear,
-          ltRealizedThisYear: ltRealizedThisYear,
-          stUnrealized: stUnrealized,
-          ltUnrealized: ltUnrealized,
-        },
-      };
-    }
 
     // -------------------------------------------------------------------------
     // FIFO method

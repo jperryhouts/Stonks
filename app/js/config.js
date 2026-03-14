@@ -28,7 +28,6 @@
       exposureMap: null,
       exposureDisplay: null,
       symbolOrder: null,
-      gainsMethod: null,
       rebalancingConfig: null,
       marginLoanDisplay: null,
     };
@@ -73,10 +72,6 @@
     }
 
     if (Array.isArray(cfg.symbolOrder)) result.symbolOrder = cfg.symbolOrder;
-
-    if (cfg.capitalGains && cfg.capitalGains.method) {
-      result.gainsMethod = cfg.capitalGains.method;
-    }
 
     // Rebalancing: explicit section takes precedence over inline display targets
     if (cfg.rebalancing && (Array.isArray(cfg.rebalancing.categories) || cfg.rebalancing.targets)) {

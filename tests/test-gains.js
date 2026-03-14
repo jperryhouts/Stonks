@@ -1090,16 +1090,4 @@ describe("computeGains drip trade type", () => {
     assert.ok(Math.abs(unrealized[0].avgCostBasis - expectedAvg) < 0.001);
   });
 
-  it("drip creates a lot with the reinvestment price as cost basis (average_cost)", () => {
-    const trades = [
-      buy("2024-01-01", "VTI", 100, 10),
-      { date: "2024-06-01", symbol: "VTI", price: "110", quantity: "0.5", type: "drip" },
-    ];
-    const mkt = market({ date: "2024-12-31", sym: "VTI", price: 120 });
-    const { unrealized } = computeGains(trades, mkt, "average_cost");
-    assert.equal(unrealized.length, 1);
-    assert.ok(close(unrealized[0].shares - 10.5));
-    const expectedAvg = (10 * 100 + 0.5 * 110) / 10.5;
-    assert.ok(Math.abs(unrealized[0].avgCostBasis - expectedAvg) < 0.001);
-  });
 });

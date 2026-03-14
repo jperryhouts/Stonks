@@ -181,7 +181,7 @@ Target percentages should sum to 100. Only display rows with a `target` field pa
 ```
 
 - **`symbolOrder`**: symbols listed here are rendered at the bottom of the stacked area chart (visually "behind" other symbols). Useful for pushing stable assets like home equity or retirement accounts to the base of the chart.
-- **`capitalGains.method`**: `"FIFO"` (default) or `"average_cost"` — lot matching method for the Gains tab. Individual sell trades can also specify a `lotDate` field to select a specific purchase lot by date, bypassing the default method. See [Transaction Log](trades.md) for details.
+- **`capitalGains.method`**: `"FIFO"` — default lot matching method for gains tracking. Individual sell trades can also specify a `lotDate` field to select a specific purchase lot by date. See [Transaction Log](trades.md) for details.
 - **`colors`**: chart color palette. Colors cycle when there are more symbols than entries.
 
 > **What you get at this point:** The Analysis tab shows your actual exposure breakdown and donut chart. The Tools tab rebalancing calculator is live.

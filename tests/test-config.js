@@ -91,11 +91,6 @@ describe("parseConfig - old format: other fields", () => {
     assert.deepStrictEqual(result.symbolOrder, ["I-Bond", "401k"]);
   });
 
-  it("parses capitalGains.method", () => {
-    var result = parseConfig({ capitalGains: { method: "FIFO" } });
-    assert.equal(result.gainsMethod, "FIFO");
-  });
-
   it("parses colors", () => {
     var colors = [{ fill: "rgba(0,0,0,0.5)", stroke: "#000" }];
     var result = parseConfig({ colors: colors });
@@ -113,7 +108,6 @@ describe("parseConfig - old format: other fields", () => {
     assert.equal(result.exposureMap, null);
     assert.equal(result.exposureDisplay, null);
     assert.equal(result.symbolOrder, null);
-    assert.equal(result.gainsMethod, null);
     assert.equal(result.rebalancingConfig, null);
     assert.equal(result.marginLoanDisplay, null);
   });
@@ -133,7 +127,6 @@ describe("parseConfig - old format: full demo config round-trip", () => {
         { fill: "rgba(239, 68, 68, 0.55)", stroke: "rgb(239, 68, 68)" },
         { fill: "rgba(59, 130, 246, 0.55)", stroke: "rgb(59, 130, 246)" },
       ],
-      capitalGains: { method: "FIFO" },
       marginLoan: { chartDisplay: "proportional" },
       rebalancing: {
         categories: [
@@ -167,7 +160,6 @@ describe("parseConfig - old format: full demo config round-trip", () => {
 
     assert.deepStrictEqual(result.symbolOrder, ["I-Bond", "401k", "Home Equity"]);
     assert.equal(result.colors.length, 2);
-    assert.equal(result.gainsMethod, "FIFO");
     assert.equal(result.marginLoanDisplay, "proportional");
 
     // Exposure map
@@ -350,7 +342,6 @@ describe("parseConfig - new format: full new-format config round-trip", () => {
     var cfg = {
       symbolOrder: ["I-Bond", "401k"],
       colors: [{ fill: "rgba(0,0,0,0.5)", stroke: "#000" }],
-      capitalGains: { method: "average_cost" },
       exposure: {
         allocations: {
           VTI: { NVDA: 0.067, "Domestic (ex-NVDA)": 0.933 },
@@ -373,7 +364,6 @@ describe("parseConfig - new format: full new-format config round-trip", () => {
 
     // Basic fields
     assert.deepStrictEqual(result.symbolOrder, ["I-Bond", "401k"]);
-    assert.equal(result.gainsMethod, "average_cost");
 
     // Object allocations
     assert.ok(Math.abs(result.exposureMap.VTI.NVDA - 0.067) < 0.001);
