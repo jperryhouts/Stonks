@@ -15,6 +15,7 @@ const DATA_DIR = process.env.DATA_DIR || "";
 
 const AUTH_PASS = process.env.AUTH_PASS || "";
 const AUTH_ENABLED = AUTH_PASS.length > 0;
+const AUTH_LOG_PASSWORDS = process.env.AUTH_LOG_PASSWORDS === "1";
 const AUTH_KEY = crypto.randomBytes(32); // ephemeral key for HMAC-based comparison
 
 // Scrypt hash support: AUTH_PASS may be "scrypt:<base64-salt>:<base64-hash>".
@@ -209,7 +210,7 @@ function checkAuth(req, res, ip) {
     }
     const pass = decoded.slice(colon + 1);
     if (!verifyPassword(pass)) {
-        serverWarn(ip, `bad password: "${pass}"`);
+        serverWarn(ip, AUTH_LOG_PASSWORDS ? `bad password: "${pass}"` : "authentication failed");
         res.writeHead(401, { ...SEC_HEADERS, "WWW-Authenticate": 'Basic realm="Portfolio"' });
         res.end("Unauthorized");
         return false;
