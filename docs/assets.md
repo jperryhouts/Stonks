@@ -1,6 +1,6 @@
 # Deterministic Assets
 
-Some assets don't need market prices — their value can be computed from a formula. Stonks supports two types: **mortgage equity** (amortization schedule) and **I-bonds** (Treasury composite rate formula). Each appears as a symbol in the chart, history, and exposure tabs, just like a stock or retirement account.
+Some assets don't need market prices — their value can be computed from a formula. Stonks supports two types: **mortgage equity** (amortization schedule) and **I-bonds** (Treasury composite rate formula). Each appears as a symbol in the chart, History, and Allocation tabs, just like a stock or retirement account.
 
 These are defined in `assets.json`:
 
@@ -185,4 +185,4 @@ Deterministic assets participate in the exposure system like any other symbol. A
 }
 ```
 
-If you don't add an `exposure.allocations` entry for a deterministic asset, it will appear in the chart and Analysis tab but not in the rebalancing tool — which is usually the right behavior for illiquid assets like home equity that you can't trade to rebalance.
+If you don't add an `exposure.allocations` entry for a deterministic asset, it will appear in the chart but not in the Allocation tab's rebalancing tool — which is usually the right behavior for illiquid assets like home equity that you can't trade to rebalance.

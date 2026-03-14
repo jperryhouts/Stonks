@@ -26,7 +26,7 @@ var REBALANCING_CONFIG = { categories: [], targets: {}, tradeable: null };
 var MARGIN_LOAN_DISPLAY = "proportional";
 var GAINS_WINDOW = "YTD";
 
-var PAD = { top: 12, right: 8, bottom: 28, left: 72 };
+var PAD = { top: 12, right: 28, bottom: 28, left: 56 };
 var ASPECT = 0.45;
 
 // Formatting helpers — loaded from js/fmt.js via Portfolio namespace
@@ -131,7 +131,7 @@ function drawChart(chart, data, hoverIdx) {
   var len = cd.length;
   if (len < 2) return;
 
-  PAD.left = w < 420 ? 54 : 72;
+  PAD.left = w < 420 ? 44 : 56;
   var pL = PAD.left,
     pT = PAD.top;
   var pW = w - PAD.left - PAD.right;
@@ -668,7 +668,7 @@ function buildHistoryTable(data, retirement, rebuildAll, trades, marketTickers) 
 
   // Sub-panels
   var balancesPanel = document.createElement("div");
-  balancesPanel.className = "history-balances";
+  balancesPanel.className = "wide-table-scroll";
   container.appendChild(balancesPanel);
   var tradesSubPanel = document.createElement("div");
   tradesSubPanel.id = "panel-trades";
@@ -1059,143 +1059,6 @@ function drawExposureChart(wrap, rows, barColors, total, onHighlight) {
   }, { passive: true });
 }
 
-function buildExposurePanel(data, trades, retirement, assets) {
-  var container = document.getElementById("panel-exposure");
-
-  // --- Existing exposure content ---
-  var exp = computeExposure(data);
-  if (!exp) {
-    return;
-  }
-
-  var total = exp.total;
-  var b = exp.buckets;
-
-  var rows = [];
-  var barColors = {};
-  for (var di = 0; di < EXPOSURE_DISPLAY.length; di++) {
-    var d = EXPOSURE_DISPLAY[di];
-    var value;
-    if (d.subcategories) {
-      // Group row: sum the listed subcategories
-      var parts = d.subcategories.split(",");
-      value = 0;
-      for (var si = 0; si < parts.length; si++) {
-        value += b[parts[si].trim()] || 0;
-      }
-    } else {
-      value = b[d.category || d.name] || 0;
-    }
-    var name = d.name;
-    rows.push({
-      name: name,
-      value: value,
-      indent: d.indent === true || d.indent === "true",
-      group: !!d.subcategories,
-    });
-    barColors[name] = d.color || "#888";
-  }
-
-  var table = document.createElement("table");
-  table.id = "exposure-table";
-
-  var thead = document.createElement("thead");
-  var hr = document.createElement("tr");
-  var hLabels = ["Category", "Value", "%"];
-  for (var i = 0; i < hLabels.length; i++) {
-    var th = document.createElement("th");
-    th.textContent = hLabels[i];
-    hr.appendChild(th);
-  }
-  thead.appendChild(hr);
-  table.appendChild(thead);
-
-  var trByName = {};
-  var tbody = document.createElement("tbody");
-  for (var j = 0; j < rows.length; j++) {
-    var r = rows[j];
-    var tr = document.createElement("tr");
-    if (r.indent) tr.className = "indent";
-    trByName[r.name] = tr;
-
-    var tdName = document.createElement("td");
-    var swatch = document.createElement("span");
-    swatch.className = "swatch";
-    swatch.style.backgroundColor = barColors[r.name] || "#888";
-    if (r.indent) swatch.style.opacity = "0.7";
-    tdName.appendChild(swatch);
-    tdName.appendChild(document.createTextNode(r.name));
-    if (r.group) tdName.style.fontWeight = "600";
-    tr.appendChild(tdName);
-
-    var tdVal = document.createElement("td");
-    tdVal.textContent = fmtDollar(r.value);
-    tr.appendChild(tdVal);
-
-    var pct = total > 0 ? (r.value / total) * 100 : 0;
-    var tdPct = document.createElement("td");
-    tdPct.textContent = pct.toFixed(1) + "%";
-    tr.appendChild(tdPct);
-
-    tbody.appendChild(tr);
-  }
-  table.appendChild(tbody);
-
-  var tfoot = document.createElement("tfoot");
-  var fr = document.createElement("tr");
-  var ftd1 = document.createElement("td");
-  ftd1.textContent = "Total";
-  fr.appendChild(ftd1);
-  var ftd2 = document.createElement("td");
-  ftd2.textContent = fmtDollar(total);
-  fr.appendChild(ftd2);
-  var ftd3 = document.createElement("td");
-  ftd3.textContent = "100.0%";
-  fr.appendChild(ftd3);
-  tfoot.appendChild(fr);
-  table.appendChild(tfoot);
-
-  function onHighlight(name) {
-    for (var n in trByName) {
-      trByName[n].classList.toggle("highlighted", n === name);
-    }
-  }
-
-  var chartWrap = document.createElement("div");
-  chartWrap.id = "exposure-chart-wrap";
-  container.appendChild(chartWrap);
-  drawExposureChart(chartWrap, rows, barColors, total, onHighlight);
-
-  var tableWrap = document.createElement("div");
-  tableWrap.id = "exposure-table-wrap";
-  tableWrap.appendChild(table);
-  container.appendChild(tableWrap);
-
-  // Warn about symbols with value but no allocation config
-  var unallocated = [];
-  var latest = data.chartData[data.chartData.length - 1];
-  for (var ui = 0; ui < data.symbols.length; ui++) {
-    var usym = data.symbols[ui];
-    if (!EXPOSURE_MAP[usym] && (latest.values[usym] || 0) > 0) {
-      unallocated.push(usym);
-    }
-  }
-  if (unallocated.length > 0) {
-    var notice = document.createElement("p");
-    notice.className = "exposure-unallocated-notice";
-    notice.textContent = "Note: " + unallocated.join(", ") +
-      (unallocated.length === 1 ? " has" : " have") +
-      " no allocation configured and " +
-      (unallocated.length === 1 ? "is" : "are") +
-      " excluded from this breakdown. Add " +
-      (unallocated.length === 1 ? "an entry" : "entries") +
-      " to config.json \u2192 exposure.allocations to include " +
-      (unallocated.length === 1 ? "it" : "them") + ".";
-    container.appendChild(notice);
-  }
-
-}
-
 // ---------------------------------------------------------------------------
 // Gains panel
 // ---------------------------------------------------------------------------
@@ -1373,7 +1236,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
       }
 
       var metricsEl = document.createElement("div");
-      metricsEl.className = "analysis-metrics";
+      metricsEl.className = "analysis-metrics wide-table-scroll";
       var mtable = document.createElement("table");
       mtable.className = "analysis-metrics-table";
 
@@ -1391,8 +1254,10 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
       var mthCum = document.createElement("th");
       mthCum.className = "analysis-metric-group-header";
       mthCum.setAttribute("colspan", "2");
-      mthCum.textContent = "Cumulative";
+      var cumWinLabel = win === "PREV_YEAR" ? prevYearLabel : win === "All" ? "" : win;
+      mthCum.textContent = cumWinLabel ? "Cumulative (" + cumWinLabel + ")" : "Cumulative";
       mhdr1.appendChild(mthCum);
+      mhdr1.appendChild(document.createElement("th")); // spacer
       mthead.appendChild(mhdr1);
 
       var mhdr2 = document.createElement("tr");
@@ -1402,6 +1267,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
         th.textContent = h;
         mhdr2.appendChild(th);
       });
+      mhdr2.appendChild(document.createElement("th")); // spacer
       mthead.appendChild(mhdr2);
       mtable.appendChild(mthead);
 
@@ -1428,6 +1294,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
         tr.appendChild(makeMetricTd(result.xirr));
         tr.appendChild(makeMetricTd(result.twrCumulative));
         tr.appendChild(makeMetricTd(result.xirrCumulative));
+        tr.appendChild(document.createElement("td")); // spacer
         mtbody.appendChild(tr);
 
         if (isExpandable) {
@@ -1449,6 +1316,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
             subTr.appendChild(makeMetricTd(symResult.xirr));
             subTr.appendChild(makeMetricTd(symResult.twrCumulative));
             subTr.appendChild(makeMetricTd(symResult.xirrCumulative));
+            subTr.appendChild(document.createElement("td")); // spacer
             mtbody.appendChild(subTr);
             subRows.push(subTr);
           });
@@ -1505,8 +1373,16 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
       else stFiltered += filteredRealized[fi].gain;
     }
 
+    // -- Realized gains table --
+    var realizedSection = document.createElement("div");
+    realizedSection.className = "gains-section";
+    var realizedTitle = document.createElement("h3");
+    realizedTitle.className = "gains-section-title";
+    realizedTitle.textContent = "Realized Gains";
+    realizedSection.appendChild(realizedTitle);
+
     var summaryWrap = document.createElement("div");
-    summaryWrap.className = "gains-summary";
+    summaryWrap.className = "gains-summary wide-table-scroll";
     var sTable = document.createElement("table");
     sTable.className = "gains-summary-table";
     var sThead = document.createElement("thead");
@@ -1522,22 +1398,14 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
     var sTbody = document.createElement("tbody");
     var sRowStr = document.createElement("tr");
     var sRowLabel = document.createElement("td");
-    sRowLabel.textContent = "Realized (" + winLabel + ")";
+    sRowLabel.textContent = "Total (" + winLabel + ")";
     sRowStr.appendChild(sRowLabel);
     sRowStr.appendChild(makeCell(fmtDollar(stFiltered), true, stFiltered));
     sRowStr.appendChild(makeCell(fmtDollar(ltFiltered), true, ltFiltered));
     sTbody.appendChild(sRowStr);
     sTable.appendChild(sTbody);
     summaryWrap.appendChild(sTable);
-    realizedContent.appendChild(summaryWrap);
-
-    // -- Realized gains table --
-    var realizedSection = document.createElement("div");
-    realizedSection.className = "gains-section";
-    var realizedTitle = document.createElement("h3");
-    realizedTitle.className = "gains-section-title";
-    realizedTitle.textContent = "Realized Gains";
-    realizedSection.appendChild(realizedTitle);
+    realizedSection.appendChild(summaryWrap);
 
     if (filteredRealized.length === 0) {
       var emptyP = document.createElement("p");
@@ -1589,7 +1457,10 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
         rTbody.appendChild(rtr);
       }
       rTable.appendChild(rTbody);
-      realizedSection.appendChild(rTable);
+      var rWrap = document.createElement("div");
+      rWrap.className = "wide-table-scroll";
+      rWrap.appendChild(rTable);
+      realizedSection.appendChild(rWrap);
     }
     realizedContent.appendChild(realizedSection);
 
@@ -1612,7 +1483,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
 
       var dThead = document.createElement("thead");
       var dHr = document.createElement("tr");
-      var dHeaders = ["Date Donated", "Symbol", "Shares", "Cost Basis", "FMV (Deduction)", "Forgone Gain", "Hold", "Type"];
+      var dHeaders = ["Date Donated", "Symbol", "Shares", "Cost Basis", "FMV (Deduction)", "Hold", "Type"];
       for (var dhi = 0; dhi < dHeaders.length; dhi++) {
         var dth = document.createElement("th");
         dth.textContent = dHeaders[dhi];
@@ -1635,14 +1506,15 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
         dtr.appendChild(makeCell(fmtShares(d.shares), true, null));
         dtr.appendChild(makeCell(fmtDollar(d.costBasis), true, null));
         dtr.appendChild(makeCell(fmtDollar(d.fmvTotal), true, null));
-        var dGainText = (d.gain >= 0 ? "+" : "") + fmtDollar(d.gain);
-        dtr.appendChild(makeCell(dGainText, true, d.gain));
         dtr.appendChild(makeCell(d.holdDays != null ? d.holdDays + "d" : "\u2014", true, null));
         dtr.appendChild(makeCell(d.isLongTerm === null ? "\u2014" : d.isLongTerm ? "Long" : "Short", true, null));
         dTbody.appendChild(dtr);
       }
       dTable.appendChild(dTbody);
-      donationsSection.appendChild(dTable);
+      var dWrap = document.createElement("div");
+      dWrap.className = "wide-table-scroll";
+      dWrap.appendChild(dTable);
+      donationsSection.appendChild(dWrap);
     }
     realizedContent.appendChild(donationsSection);
   }
@@ -1656,7 +1528,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
 
   // -- Unrealized summary --
   var uSummaryWrap = document.createElement("div");
-  uSummaryWrap.className = "gains-summary";
+  uSummaryWrap.className = "gains-summary wide-table-scroll";
   var uSTable = document.createElement("table");
   uSTable.className = "gains-summary-table";
   var uSThead = document.createElement("thead");
@@ -1779,7 +1651,10 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
       }
     }
     uTable.appendChild(uTbody);
-    unrealizedSection.appendChild(uTable);
+    var uWrap = document.createElement("div");
+    uWrap.className = "wide-table-scroll";
+    uWrap.appendChild(uTable);
+    unrealizedSection.appendChild(uWrap);
   }
   unrealizedPanel.appendChild(unrealizedSection);
 
@@ -2245,7 +2120,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   // Tab switching
   var tabs = document.querySelectorAll("#tabs .tab");
-  var panelNames = ["chart", "exposure", "table", "gains", "tools"];
+  var panelNames = ["chart", "tools", "gains", "table"];
   for (var ti = 0; ti < tabs.length; ti++) {
     tabs[ti].addEventListener("click", function () {
       var target = this.getAttribute("data-tab");
@@ -2295,10 +2170,8 @@ document.addEventListener("DOMContentLoaded", async function () {
           ? Object.keys(market[0]).filter(function (k) { return k !== "timestamp"; })
           : [];
         buildHistoryTable(fullData, retirement, rebuildAll, trades, tickers);
-        document.getElementById("panel-exposure").innerHTML = "";
-        buildExposurePanel(fullData, trades, retirement, assets);
         buildGainsPanel(gainsData, fullData, trades, retirement, assets);
-        buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG);
+        buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG, EXPOSURE_DISPLAY);
         showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
       });
   }
@@ -2325,9 +2198,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   updateTitle();
   updateDetail(state.data, state.data.chartData.length - 1);
   buildHistoryTable(fullData, retirement, rebuildAll, trades, marketTickers);
-  buildExposurePanel(fullData, trades, retirement, assets);
   buildGainsPanel(gainsData, fullData, trades, retirement, assets);
-  buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG);
+  buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG, EXPOSURE_DISPLAY);
   showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
   attachListeners(canvas, state, chartRef);
   document.body.classList.remove("loading");

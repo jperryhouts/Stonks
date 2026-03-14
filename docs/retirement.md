@@ -4,7 +4,7 @@ Employer-sponsored accounts (401k, 403b, HSA) don't offer daily API access to th
 
 ## The problem
 
-For the chart to show smooth daily values — and for the Analysis tab to include your 401k in exposure calculations — the app needs a value for every market day, not just the handful of dates where you logged in and checked your balance.
+For the chart to show smooth daily values — and for the Allocation tab to include your 401k in exposure calculations — the app needs a value for every market day, not just the handful of dates where you logged in and checked your balance.
 
 A naive approach would be linear interpolation: draw a straight line between known values. But markets don't move in straight lines. If the market crashed 10% in February and recovered by April, linear interpolation would miss that entirely.
 
@@ -36,7 +36,7 @@ Instead, Stonks tracks a **market proxy** — a ticker whose daily price is know
 Each contribution represents capital entering the account. The app starts the account at $0 on the first contribution date and builds daily values from there — accumulating deposits and scaling with the proxy. Ground-truth values are optional snapshots of your actual balance; when one arrives, it corrects any drift between the proxy estimate and reality.
 
 - **`proxy`**: the ticker to track. Defaults to VTI if omitted.
-- **`contributions`**: the primary way to record account value. Each entry represents capital entering the account (payroll deductions, employer matches). The app builds daily values by accumulating contributions and scaling with the proxy. Also required for accurate return metrics (TWR/XIRR) on the Analysis tab — without them, the app can't distinguish investment growth from deposited capital.
+- **`contributions`**: the primary way to record account value. Each entry represents capital entering the account (payroll deductions, employer matches). The app builds daily values by accumulating contributions and scaling with the proxy. Also required for accurate return metrics (TWR/XIRR) on the Performance tab — without them, the app can't distinguish investment growth from deposited capital.
 - **`values`**: optional balance snapshots that pin the estimate to reality. Add one whenever you check your actual balance. Each snapshot corrects drift between the proxy and your account's real performance.
 
 ### The formula
@@ -88,7 +88,7 @@ The ground truth corrected any drift accumulated over the prior year. Future int
 
 ## Return metrics
 
-The Analysis tab computes TWR and XIRR for each retirement account. Each contribution is converted to a synthetic "buy" trade (quantity 1, price = contribution amount) and fed into these calculations. This tells the returns engine how much external capital entered the account and when.
+The Performance tab (Realized sub-tab) computes TWR and XIRR for each retirement account. Each contribution is converted to a synthetic "buy" trade (quantity 1, price = contribution amount) and fed into these calculations. This tells the returns engine how much external capital entered the account and when.
 
 Without contributions, the app would treat the entire account value as investment return — if your 401k is worth $50,000 but you contributed $40,000 of that, XIRR needs to know about the $40,000 to report the correct 25% return instead of treating it as infinite return on zero investment.
 
@@ -97,9 +97,10 @@ Without contributions, the app would treat the entire account value as investmen
 Once interpolated, retirement account values are treated like any other symbol:
 
 - **Overview tab**: included in the stacked area chart. Order controlled by `symbolOrder` in `config.json` (retirement accounts are typically placed at the bottom of the stack).
-- **Analysis tab**: included in exposure calculations via fractional allocations (see [Exposure Tracking](exposure.md)). A 401k in a target-date fund can be split across Domestic, International, and Bond categories. TWR and XIRR return metrics are also computed here — contributions are the cash flows (see [Return metrics](#return-metrics)).
+- **Allocation tab**: included in exposure calculations via fractional allocations (see [Exposure Tracking](exposure.md)). A 401k in a target-date fund can be split across Domestic, International, and Bond categories.
+- **Performance tab (Realized sub-tab)**: TWR and XIRR return metrics are computed here — contributions are the cash flows (see [Return metrics](#return-metrics)).
 - **History tab**: shows the interpolated daily value. Ground-truth cells are editable — double-click to update the value (long-press on mobile), which writes back to `retirement.json` via the server.
-- **Gains tab**: shows capital gains (realized/unrealized) for brokerage symbols. Retirement accounts don't have individual trade lots, so they don't appear here.
+- **Performance tab**: shows capital gains (realized/unrealized) for brokerage symbols. Retirement accounts don't have individual trade lots, so they don't appear here.
 
 ## Adding a new retirement account
 
@@ -118,7 +119,7 @@ Once interpolated, retirement account values are treated like any other symbol:
    { "date": "2025-01-01", "account": "HSA", "value": "5000" }
    ```
 
-3. Add an allocation entry to `config.json` so the account appears in the Analysis tab:
+3. Add an allocation entry to `config.json` so the account appears in the Allocation tab:
    ```json
    "exposure": {
      "allocations": {

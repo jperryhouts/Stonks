@@ -52,7 +52,7 @@ const SEC_HEADERS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
     "Content-Security-Policy":
-        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'",
+        "default-src 'none'; script-src 'self'; style-src 'self' 'sha256-6ZeVojpIEHRFC4Rwwl4418UmEumrFjgLT6LOPg/q6n8='; img-src 'self'; media-src 'none'; connect-src 'self'",
 };
 
 // Files in app/ that are server tooling, not browser content.

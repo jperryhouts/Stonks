@@ -10,7 +10,7 @@
 ]
 ```
 
-All values are strings. The `price` should match the actual closing price on that date — the chart uses `market.csv` for daily valuation, but the Gains tab uses trade prices for cost basis.
+All values are strings. The `price` should match the actual closing price on that date — the chart uses `market.csv` for daily valuation, but the Performance tab uses trade prices for cost basis.
 
 ## Trade types
 
@@ -31,7 +31,7 @@ The `type` field determines the transaction type. Quantity is always positive �
 { "date": "2024-09-20", "symbol": "VTI", "price": "278.50", "quantity": "0.12", "type": "drip" }
 ```
 
-**Charitable donations** — `type: "donate"` tracks donated shares separately in the Gains tab:
+**Charitable donations** — `type: "donate"` tracks donated shares separately in the Performance tab:
 ```json
 { "date": "2024-12-01", "symbol": "VTI", "price": "290.00", "quantity": "2", "type": "donate" }
 ```

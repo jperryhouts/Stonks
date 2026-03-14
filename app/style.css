@@ -4,12 +4,18 @@ html { overflow-x: hidden; } /* prevent viewport-level horizontal scroll */
 
 body {
     font-family: system-ui, -apple-system, sans-serif;
-    max-width: 720px;
+    max-width: 625px;
     margin: 0 auto;
     padding: 1rem;
     color: #1a1a1a;
     background: #fafafa;
 }
+
+/* Reveal body: the inline <style> sets body{visibility:hidden} to prevent
+   FOUC before this stylesheet loads. The .loading class is present from the
+   very start (set in HTML), so this fires the moment the stylesheet applies.
+   body:not(.loading) keeps it visible after JS removes the loading class. */
+body.loading, body:not(.loading) { visibility: visible; }
 
 main { line-height: 1.5; }
 
@@ -98,7 +104,7 @@ main { line-height: 1.5; }
 #time-window {
     position: absolute;
     top: 12px;
-    left: 76px;
+    left: 60px;
     z-index: 1;
     font-family: inherit;
     font-size: 0.8125rem;
@@ -111,7 +117,7 @@ main { line-height: 1.5; }
 }
 
 @media (max-width: 452px) {
-    #time-window { left: 58px; }
+    #time-window { left: 48px; }
 }
 
 #chart {
@@ -230,17 +236,34 @@ main { line-height: 1.5; }
     vertical-align: middle;
 }
 
-/* History table */
+/* Shared horizontal scroll wrapper — used by History, Allocation, and Performance tables */
 
-.history-balances {
-    /* Expand to full viewport width so the table can use available space.
-       calc(-50vw + 50%) offsets the body's max-width centering and padding. */
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
+.wide-table-scroll {
+    /* Expand to full viewport width, centered. Using position+transform instead of
+       negative margins so Chrome correctly resolves the BFC content width as 100vw. */
+    position: relative;
+    width: 100vw;
+    left: 50%;
+    transform: translateX(-50%);
     overflow-x: auto;
-    overflow-y: clip; /* avoid implicit overflow-y:auto which would break sticky thead */
+    overflow-y: clip;
     -webkit-overflow-scrolling: touch;
 }
+
+.wide-table-scroll > table {
+    /* Fill column width when narrow; expand/center when wider than column */
+    min-width: calc(625px - 2rem); /* body max-width minus padding */
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@media (max-width: 625px) {
+    .wide-table-scroll > table {
+        min-width: calc(100vw - 2rem);
+    }
+}
+
+/* History table */
 
 #history-table {
     width: max-content; /* natural width; centered when narrower than viewport */
@@ -369,63 +392,20 @@ main { line-height: 1.5; }
     gap: 0.4rem;
 }
 
-/* Exposure table */
-
-#exposure-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.875rem;
-    font-variant-numeric: tabular-nums;
-}
-
-#exposure-table th,
-#exposure-table td {
-    text-align: right;
-    padding: 0.5rem 0.6rem;
-}
-
-#exposure-table th:first-child,
-#exposure-table td:first-child {
-    text-align: left;
-}
-
-#exposure-table thead th {
-    position: sticky;
-    top: 0;
-    background: #fafafa;
-    border-bottom: 1px solid #e0e0e0;
-    color: #666;
-    font-weight: 500;
-}
-
-#exposure-table tfoot td {
-    border-top: 2px solid #ccc;
-    font-weight: 600;
-}
-
-#exposure-table tr.indent td:first-child {
+.rebal-table tr.indent td:first-child {
     padding-left: 1.5rem;
     color: #555;
 }
 
-/* Exposure ring chart */
-
-#exposure-chart-wrap {
+#tools-chart-wrap {
     display: flex;
     justify-content: center;
-    margin: 0.75rem auto 1rem auto;
+    margin-bottom: 1rem;
 }
 
-#exposure-table tr.highlighted {
-    background: #eef2ff;
+.rebal-table tr.highlighted {
+    background: #eff6ff;
 }
-
-.exposure-unallocated-notice {
-    margin: 0.75rem 0 0 0;
-    font-size: 0.8125rem;
-    color: #6b7280;
-}
-
 
 /* Trades editor */
 
@@ -604,7 +584,7 @@ main { line-height: 1.5; }
     border-collapse: collapse;
     font-size: 0.875rem;
     font-variant-numeric: tabular-nums;
-    min-width: 340px;
+    width: max-content;
 }
 
 .gains-summary-table th,
@@ -646,7 +626,7 @@ main { line-height: 1.5; }
 }
 
 .gains-table {
-    width: 100%;
+    width: max-content;
     border-collapse: collapse;
     font-size: 0.8125rem;
     font-variant-numeric: tabular-nums;
@@ -766,6 +746,8 @@ body.loading #time-window { visibility: hidden; }
     animation: shimmer 1.6s ease-in-out infinite;
     border-radius: 3px;
 }
+.skeleton-bar--short  { width: 35%; }
+.skeleton-bar--medium { width: 80%; }
 
 /* Spinner — centered over the skeleton chart area */
 #loading-spinner {
@@ -812,12 +794,19 @@ body:not(.loading) #loading-spinner { display: none; }
 
 .analysis-metrics {
     margin-bottom: 1.5rem;
+    padding-bottom: 1.25rem;
 }
 
 .analysis-metrics-table {
-    width: 100%;
     border-collapse: collapse;
     margin-bottom: 0.25rem;
+    width: max-content;
+    font-size: 0.875rem;
+}
+
+.analysis-metrics-table th:last-child,
+.analysis-metrics-table td:last-child {
+    width: 100%; /* spacer column — absorbs remaining space, content aligns left */
 }
 
 .analysis-metrics-table tr {
@@ -839,20 +828,20 @@ body:not(.loading) #loading-spinner { display: none; }
 
 .analysis-metrics-table th:not(:first-child) {
     text-align: right;
+    padding-left: 1.5rem;
 }
 
 .analysis-metric-label {
     padding: 0.4rem 0;
     color: #555;
-    font-size: 0.9375rem;
+    white-space: nowrap;
 }
 
 .analysis-metric-value {
-    padding: 0.4rem 0;
+    padding: 0.4rem 0 0.4rem 1.5rem;
     text-align: right;
-    font-size: 1.125rem;
-    font-weight: 600;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .analysis-metric-caption {
@@ -867,6 +856,7 @@ body:not(.loading) #loading-spinner { display: none; }
     padding-bottom: 0.2rem;
     border-left: 1px solid #e8e8e8;
     color: #888;
+    white-space: nowrap;
     font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -895,6 +885,10 @@ body:not(.loading) #loading-spinner { display: none; }
 /* -------------------------------------------------------------------------
    Tools tab — shared sub-tab bar
    ------------------------------------------------------------------------- */
+
+.tools-shared-section {
+    margin-bottom: 1.5rem;
+}
 
 .tools-subtabs {
     display: flex;
@@ -1004,7 +998,7 @@ body:not(.loading) #loading-spinner { display: none; }
 }
 
 .rebal-table {
-    width: 100%;
+    width: max-content;
     border-collapse: collapse;
     font-size: 0.875rem;
     font-variant-numeric: tabular-nums;
@@ -1014,7 +1008,8 @@ body:not(.loading) #loading-spinner { display: none; }
 .rebal-table th,
 .rebal-table td {
     text-align: right;
-    padding: 0.4rem 0.6rem;
+    padding: 0.35rem 0.4rem;
+    white-space: nowrap;
 }
 
 .rebal-table th:first-child,
@@ -1038,6 +1033,11 @@ body:not(.loading) #loading-spinner { display: none; }
     background: #f5f5f5;
 }
 
+.rebal-table td .rebal-target-input-wrap {
+    display: inline-flex;
+    width: 3.75rem;
+}
+
 .rebal-buy  { color: #16a34a; }
 .rebal-sell { color: #dc2626; }
 .rebal-zero { color: #888; }
@@ -1047,7 +1047,7 @@ body:not(.loading) #loading-spinner { display: none; }
    Utility
    ------------------------------------------------------------------------- */
 
-.hidden { display: none; } /* supersedes legacy .panel.hidden and .detail.hidden */
+.hidden { display: none !important; } /* supersedes legacy .panel.hidden and .detail.hidden */
 
 /* -------------------------------------------------------------------------
    Tools tab — shared targets section
@@ -1109,10 +1109,4 @@ body:not(.loading) #loading-spinner { display: none; }
 .contrib-amount-input::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
-}
-
-.contrib-placeholder {
-    font-size: 0.875rem;
-    color: #888;
-    margin-top: 1rem;
 }

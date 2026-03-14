@@ -406,67 +406,67 @@
   }
 
   // ---------------------------------------------------------------------------
-  // DOM builder (called from app.js — implemented in Task 6)
+  // DOM builder
   // ---------------------------------------------------------------------------
 
-  function buildToolsPanel(fullData, exposureMap, rebalancingConfig) {
+  function buildToolsPanel(fullData, exposureMap, rebalancingConfig, exposureDisplay) {
     var container = document.getElementById("panel-tools");
     if (!container) return;
     container.innerHTML = "";
 
+    // Compute exposure for donut + merged table values
+    var exp = computeExposure(fullData);
+    var chartRows = [];
+    var barColors = {};
+    if (exp) {
+      for (var di = 0; di < exposureDisplay.length; di++) {
+        var d = exposureDisplay[di];
+        var dv;
+        if (d.subcategories) {
+          var parts = d.subcategories.split(",");
+          dv = 0;
+          for (var si = 0; si < parts.length; si++) dv += exp.buckets[parts[si].trim()] || 0;
+        } else {
+          dv = exp.buckets[d.category || d.name] || 0;
+        }
+        chartRows.push({ name: d.name, value: dv,
+                         indent: d.indent === true || d.indent === "true",
+                         group: !!d.subcategories });
+        barColors[d.name] = d.color || "#888";
+      }
+    }
+
+    // Mutable row lookup populated by renderCategoryTable; used by donut hover
+    var rebalTrByName = {};
+    function onHighlightRebal(name) {
+      for (var n in rebalTrByName) {
+        rebalTrByName[n].classList.toggle("highlighted", n === name);
+      }
+    }
+
     var cats = rebalancingConfig.categories || [];
     var defaultTargets = rebalancingConfig.targets || {};
 
-    // Live target state shared across both sub-tabs
+    // Live target state shared across all sub-tabs
     var liveTargets = {};
     cats.forEach(function (rc) {
       liveTargets[rc.name] = defaultTargets[rc.name] || 0;
     });
 
-    // --- Shared section: target inputs + validation hint ---
+    // --- Shared section: donut chart + category table ---
     var sharedSection = document.createElement("div");
-    sharedSection.className = "tools-shared";
+    sharedSection.className = "tools-shared-section";
 
-    var targetsRow = document.createElement("div");
-    targetsRow.className = "rebal-targets";
+    if (exp && exp.total > 0) {
+      var chartWrap = document.createElement("div");
+      chartWrap.id = "tools-chart-wrap";
+      drawExposureChart(chartWrap, chartRows, barColors, exp.total, onHighlightRebal);
+      sharedSection.appendChild(chartWrap);
+    }
 
-    var inputs = {};
-    cats.forEach(function (rc) {
-      var field = document.createElement("div");
-      field.className = "rebal-target-field";
-
-      var label = document.createElement("div");
-      label.className = "rebal-target-label";
-      label.textContent = rc.name;
-
-      var wrap = document.createElement("div");
-      wrap.className = "rebal-target-input-wrap";
-
-      var inp = document.createElement("input");
-      inp.type = "number";
-      inp.className = "rebal-target-input";
-      inp.min = "0";
-      inp.max = "100";
-      inp.step = "1";
-      inp.value = String(liveTargets[rc.name]);
-      inputs[rc.name] = inp;
-
-      var pctLabel = document.createElement("span");
-      pctLabel.className = "rebal-target-pct";
-      pctLabel.textContent = "%";
-
-      wrap.appendChild(inp);
-      wrap.appendChild(pctLabel);
-      field.appendChild(label);
-      field.appendChild(wrap);
-      targetsRow.appendChild(field);
-    });
-
-    sharedSection.appendChild(targetsRow);
-
-    var validationHint = document.createElement("div");
-    validationHint.className = "rebal-validation";
-    sharedSection.appendChild(validationHint);
+    var sharedOutputArea = document.createElement("div");
+    sharedSection.appendChild(sharedOutputArea);
+    container.appendChild(sharedSection);
 
     // --- Sub-tab bar ---
     var subtabBar = document.createElement("div");
@@ -474,77 +474,72 @@
 
     var rebalBtn = document.createElement("button");
     rebalBtn.className = "tools-subtab active";
-    rebalBtn.textContent = "Rebalancing";
+    rebalBtn.textContent = "Rebalance";
 
-    var contribBtn = document.createElement("button");
-    contribBtn.className = "tools-subtab";
-    contribBtn.textContent = "Contributions";
+    var investBtn = document.createElement("button");
+    investBtn.className = "tools-subtab";
+    investBtn.textContent = "Invest";
+
+    var withdrawBtn = document.createElement("button");
+    withdrawBtn.className = "tools-subtab";
+    withdrawBtn.textContent = "Withdraw";
 
     subtabBar.appendChild(rebalBtn);
-    subtabBar.appendChild(contribBtn);
+    subtabBar.appendChild(investBtn);
+    subtabBar.appendChild(withdrawBtn);
     container.appendChild(subtabBar);
 
-    container.appendChild(sharedSection);
+    // --- Invest amount row (hidden until Invest tab is active) ---
+    var investAmountRow = document.createElement("div");
+    investAmountRow.className = "contrib-amount-row hidden";
+    var investAmountLabel = document.createElement("label");
+    investAmountLabel.className = "contrib-amount-label";
+    investAmountLabel.textContent = "Amount to invest";
+    var investAmountWrap = document.createElement("div");
+    investAmountWrap.className = "contrib-amount-input-wrap";
+    var investDollar = document.createElement("span");
+    investDollar.className = "contrib-dollar";
+    investDollar.textContent = "$";
+    var investAmountInput = document.createElement("input");
+    investAmountInput.type = "number";
+    investAmountInput.className = "contrib-amount-input";
+    investAmountInput.step = "100";
+    investAmountInput.min = "0";
+    investAmountInput.placeholder = "0";
+    investAmountInput.value = "";
+    investAmountWrap.appendChild(investDollar);
+    investAmountWrap.appendChild(investAmountInput);
+    investAmountRow.appendChild(investAmountLabel);
+    investAmountRow.appendChild(investAmountWrap);
+    container.appendChild(investAmountRow);
 
-    // --- Rebalancing sub-panel ---
-    var rebalPanel = document.createElement("div");
-    rebalPanel.id = "tools-rebal-panel";
-    var rebalOutputArea = document.createElement("div");
-    rebalPanel.appendChild(rebalOutputArea);
-    container.appendChild(rebalPanel);
+    // --- Withdraw amount row (hidden until Withdraw tab is active) ---
+    var withdrawAmountRow = document.createElement("div");
+    withdrawAmountRow.className = "contrib-amount-row hidden";
+    var withdrawAmountLabel = document.createElement("label");
+    withdrawAmountLabel.className = "contrib-amount-label";
+    withdrawAmountLabel.textContent = "Amount to withdraw";
+    var withdrawAmountWrap = document.createElement("div");
+    withdrawAmountWrap.className = "contrib-amount-input-wrap";
+    var withdrawDollar = document.createElement("span");
+    withdrawDollar.className = "contrib-dollar";
+    withdrawDollar.textContent = "$";
+    var withdrawAmountInput = document.createElement("input");
+    withdrawAmountInput.type = "number";
+    withdrawAmountInput.className = "contrib-amount-input";
+    withdrawAmountInput.step = "100";
+    withdrawAmountInput.min = "0";
+    withdrawAmountInput.placeholder = "0";
+    withdrawAmountInput.value = "";
+    withdrawAmountWrap.appendChild(withdrawDollar);
+    withdrawAmountWrap.appendChild(withdrawAmountInput);
+    withdrawAmountRow.appendChild(withdrawAmountLabel);
+    withdrawAmountRow.appendChild(withdrawAmountWrap);
+    container.appendChild(withdrawAmountRow);
 
-    // --- Contributions sub-panel ---
-    var contribPanel = document.createElement("div");
-    contribPanel.id = "tools-contrib-panel";
-    contribPanel.className = "hidden";
-
-    var amountRow = document.createElement("div");
-    amountRow.className = "contrib-amount-row";
-
-    var amountLabel = document.createElement("label");
-    amountLabel.className = "contrib-amount-label";
-    amountLabel.textContent = "Amount (negative to withdraw)";
-
-    var amountWrap = document.createElement("div");
-    amountWrap.className = "contrib-amount-input-wrap";
-
-    var dollarSign = document.createElement("span");
-    dollarSign.className = "contrib-dollar";
-    dollarSign.textContent = "$";
-
-    var amountInput = document.createElement("input");
-    amountInput.type = "number";
-    amountInput.id = "tools-contrib-amount";
-    amountInput.className = "contrib-amount-input";
-    amountInput.step = "100";
-    amountInput.placeholder = "0";
-    amountInput.value = "";
-
-    amountWrap.appendChild(dollarSign);
-    amountWrap.appendChild(amountInput);
-    amountRow.appendChild(amountLabel);
-    amountRow.appendChild(amountWrap);
-    contribPanel.appendChild(amountRow);
-
-    var contribOutputArea = document.createElement("div");
-    contribPanel.appendChild(contribOutputArea);
-
-    container.appendChild(contribPanel);
-
-    // --- Sub-tab switching ---
-    rebalBtn.addEventListener("click", function () {
-      rebalBtn.classList.add("active");
-      contribBtn.classList.remove("active");
-      rebalPanel.classList.remove("hidden");
-      contribPanel.classList.add("hidden");
-    });
-
-    contribBtn.addEventListener("click", function () {
-      contribBtn.classList.add("active");
-      rebalBtn.classList.remove("active");
-      contribPanel.classList.remove("hidden");
-      rebalPanel.classList.add("hidden");
-    });
+    // --- Trades output area (single shared div) ---
+    var tradesOutputArea = document.createElement("div");
+    container.appendChild(tradesOutputArea);
 
     // --- Shared helpers ---
     function fmtPct(v) { return v.toFixed(1) + "%"; }
@@ -563,207 +558,315 @@
                cls: v > 0.005 ? "rebal-buy" : v < -0.005 ? "rebal-sell" : "rebal-zero" };
     }
 
-    // --- Rebalancing render ---
-    function renderRebal() {
-      cats.forEach(function (rc) {
-        liveTargets[rc.name] = parseFloat(inputs[rc.name].value) || 0;
-      });
+    // --- Active panel tracking ---
+    var activePanel = "rebalance";
+
+    // --- Category table (shared, always visible, mode-adaptive) ---
+    function renderCategoryTable() {
+      var contribAmount = 0;
+      if (activePanel === "invest") contribAmount = parseFloat(investAmountInput.value) || 0;
+      if (activePanel === "withdraw") contribAmount = -(parseFloat(withdrawAmountInput.value) || 0);
+      var useContribMode = activePanel !== "rebalance";
 
       var sum = cats.reduce(function (s, rc) { return s + liveTargets[rc.name]; }, 0);
-      validationHint.textContent = (Math.abs(sum - 100) > 0.01)
-        ? "Targets sum to " + sum.toFixed(1) + "% — adjust to 100% for a balanced result"
-        : "";
 
-      var result = computeRebalancing(fullData, exposureMap, cats, liveTargets, {
+      var rebalResult = computeRebalancing(fullData, exposureMap, cats, liveTargets, {
         tradeable: rebalancingConfig.tradeable || null,
       });
-      rebalOutputArea.innerHTML = "";
+      var contribResult = useContribMode
+        ? computeContributions(fullData, exposureMap, cats, liveTargets, contribAmount, {
+            tradeable: rebalancingConfig.tradeable || null,
+          })
+        : null;
 
-      // Category summary table
-      var catTitle = document.createElement("div");
-      catTitle.className = "rebal-section-title";
-      catTitle.textContent = "By Category";
-      rebalOutputArea.appendChild(catTitle);
+      sharedOutputArea.innerHTML = "";
 
-      var catTable = document.createElement("table");
-      catTable.className = "rebal-table";
-      var thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>Category</th><th>Current</th><th>Current %</th>" +
-        "<th>Target %</th><th>Difference</th><th>Over / Under</th></tr>";
-      catTable.appendChild(thead);
-      var tbody = document.createElement("tbody");
-      result.categories.forEach(function (cat) {
-        var tr = document.createElement("tr");
-        var diff = cat.currentPct - cat.targetPct;
-        var bs = fmtOverUnder(cat.buySell);
-        var tdName = document.createElement("td"); tdName.textContent = cat.name; tr.appendChild(tdName);
-        var tdCur = document.createElement("td"); tdCur.innerHTML = Portfolio.fmtDollar(cat.currentValue); tr.appendChild(tdCur);
-        var tdCurPct = document.createElement("td"); tdCurPct.textContent = fmtPct(cat.currentPct); tr.appendChild(tdCurPct);
-        var tdTgt = document.createElement("td"); tdTgt.textContent = fmtPct(cat.targetPct); tr.appendChild(tdTgt);
-        var tdDiff = document.createElement("td");
-        tdDiff.className = diff > 0.05 ? "rebal-sell" : diff < -0.05 ? "rebal-buy" : "rebal-zero";
-        tdDiff.textContent = (diff >= 0 ? "+" : "") + fmtPct(diff);
-        tr.appendChild(tdDiff);
-        var tdBs = document.createElement("td"); tdBs.className = bs.cls; tdBs.textContent = bs.text; tr.appendChild(tdBs);
-        tbody.appendChild(tr);
-      });
-      catTable.appendChild(tbody);
-      var tfoot = document.createElement("tfoot");
-      tfoot.innerHTML = "<tr><td>Total</td><td>" + Portfolio.fmtDollar(result.portfolioTotal) +
-        "</td><td>100.0%</td><td>" + fmtPct(sum) + "</td><td></td><td></td></tr>";
-      catTable.appendChild(tfoot);
-      rebalOutputArea.appendChild(catTable);
-
-      // Per-ticker table
-      var tickTitle = document.createElement("div");
-      tickTitle.className = "rebal-section-title";
-      tickTitle.textContent = "By Ticker";
-      rebalOutputArea.appendChild(tickTitle);
-
-      var tickTable = document.createElement("table");
-      tickTable.className = "rebal-table";
-      var thead2 = document.createElement("thead");
-      thead2.innerHTML = "<tr><th>Ticker</th><th>Current Value</th><th>Current %</th>" +
-        "<th>Implied Target</th><th>Buy / Sell</th></tr>";
-      tickTable.appendChild(thead2);
-      var tbody2 = document.createElement("tbody");
-      result.tickers.forEach(function (t) {
-        if (t.currentValue <= 0) return;
-        var tr = document.createElement("tr");
-        var tdSym = document.createElement("td"); tdSym.textContent = t.symbol; tr.appendChild(tdSym);
-        var tdVal = document.createElement("td"); tdVal.innerHTML = Portfolio.fmtDollar(t.currentValue); tr.appendChild(tdVal);
-        var tdPct = document.createElement("td"); tdPct.textContent = fmtPct(t.currentPct); tr.appendChild(tdPct);
-        var tdImp = document.createElement("td");
-        if (t.impliedTarget === null) { tdImp.className = "rebal-dash"; tdImp.textContent = "\u2014"; }
-        else { tdImp.innerHTML = Portfolio.fmtDollar(t.impliedTarget); }
-        tr.appendChild(tdImp);
-        var tdBs2 = document.createElement("td");
-        if (t.buySell === null) { tdBs2.className = "rebal-dash"; tdBs2.textContent = "\u2014"; }
-        else { var bs2 = fmtBuySell(t.buySell); tdBs2.className = bs2.cls; tdBs2.textContent = bs2.text; }
-        tr.appendChild(tdBs2);
-        tbody2.appendChild(tr);
-      });
-      tickTable.appendChild(tbody2);
-      rebalOutputArea.appendChild(tickTable);
-    }
-
-    // --- Contributions render ---
-    function renderContrib() {
-      cats.forEach(function (rc) {
-        liveTargets[rc.name] = parseFloat(inputs[rc.name].value) || 0;
-      });
-
-      var sum = cats.reduce(function (s, rc) { return s + liveTargets[rc.name]; }, 0);
-      validationHint.textContent = (Math.abs(sum - 100) > 0.01)
-        ? "Targets sum to " + sum.toFixed(1) + "% — adjust to 100% for a balanced result"
-        : "";
-
-      var amount = parseFloat(amountInput.value) || 0;
-      var result = computeContributions(fullData, exposureMap, cats, liveTargets, amount, {
-        tradeable: rebalancingConfig.tradeable || null,
-      });
-      contribOutputArea.innerHTML = "";
-
-      if (amount === 0) {
-        var placeholder = document.createElement("div");
-        placeholder.className = "contrib-placeholder";
-        placeholder.textContent = "Enter an amount above to see allocation guidance.";
-        contribOutputArea.appendChild(placeholder);
-        return;
+      // Validation hint
+      if (Math.abs(sum - 100) > 0.01) {
+        var hint = document.createElement("div");
+        hint.className = "rebal-validation";
+        hint.textContent = "Targets sum to " + sum.toFixed(1) + "% — adjust to 100% for a balanced result";
+        sharedOutputArea.appendChild(hint);
       }
 
-      // Category summary table
-      var catTitle = document.createElement("div");
-      catTitle.className = "rebal-section-title";
-      catTitle.textContent = "By Category";
-      contribOutputArea.appendChild(catTitle);
-
+      // Category table with inline target inputs
       var catTable = document.createElement("table");
       catTable.className = "rebal-table";
       var thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>Category</th><th>Current Value</th><th>Current %</th>" +
-        "<th>Target %</th><th>Buy / Sell</th><th>New Value</th><th>New %</th></tr>";
+      if (useContribMode) {
+        var col5Header = activePanel === "invest" ? "Buy" : "Sell";
+        thead.innerHTML = "<tr><th>Category</th><th>Value</th><th>%</th>" +
+          "<th>Target %</th><th>" + col5Header + "</th><th>New %</th></tr>";
+      } else {
+        thead.innerHTML = "<tr><th>Category</th><th>Value</th><th>%</th>" +
+          "<th>Target %</th><th>Difference</th><th>Over / Under</th></tr>";
+      }
       catTable.appendChild(thead);
+
+      rebalTrByName = {};
+      var catByName = {};
+      rebalResult.categories.forEach(function(c) { catByName[c.name] = c; });
+      var contribByName = {};
+      if (contribResult) {
+        contribResult.categories.forEach(function(c) { contribByName[c.name] = c; });
+      }
+
+      var expTotal = exp ? exp.total : 0;
+      var inlineInputs = {};
       var tbody = document.createElement("tbody");
-      result.categories.forEach(function (cat) {
-        var newCatValue = cat.currentValue + cat.contribution;
-        var newCatPct = result.newTotal > 0 ? (newCatValue / result.newTotal) * 100 : 0;
+      for (var rdi = 0; rdi < exposureDisplay.length; rdi++) {
+        var rd = exposureDisplay[rdi];
+        var rdv;
+        if (rd.subcategories) {
+          var rdparts = rd.subcategories.split(",");
+          rdv = 0;
+          for (var rsi = 0; rsi < rdparts.length; rsi++) rdv += (exp ? exp.buckets[rdparts[rsi].trim()] : 0) || 0;
+        } else {
+          rdv = exp ? (exp.buckets[rd.category || rd.name] || 0) : 0;
+        }
+        var rdPct = expTotal > 0 ? (rdv / expTotal) * 100 : 0;
+        var rcat = catByName[rd.name];
+
         var tr = document.createElement("tr");
-        var tdName = document.createElement("td"); tdName.textContent = cat.name; tr.appendChild(tdName);
-        var tdCur = document.createElement("td"); tdCur.innerHTML = Portfolio.fmtDollar(cat.currentValue); tr.appendChild(tdCur);
-        var tdCurPct = document.createElement("td"); tdCurPct.textContent = fmtPct(cat.currentPct); tr.appendChild(tdCurPct);
-        var tdTgt = document.createElement("td"); tdTgt.textContent = fmtPct(cat.targetPct); tr.appendChild(tdTgt);
-        var tdBuy = document.createElement("td");
-        tdBuy.className = cat.contribution > 0.005 ? "rebal-buy"
-          : cat.contribution < -0.005 ? "rebal-sell"
-          : "rebal-zero";
-        tdBuy.innerHTML = Portfolio.fmtDollar(cat.contribution);
-        tr.appendChild(tdBuy);
-        var tdNewVal = document.createElement("td"); tdNewVal.innerHTML = Portfolio.fmtDollar(newCatValue); tr.appendChild(tdNewVal);
-        var tdNewPct = document.createElement("td"); tdNewPct.textContent = fmtPct(newCatPct); tr.appendChild(tdNewPct);
+        if (rd.indent === true || rd.indent === "true") tr.className = "indent";
+        rebalTrByName[rd.name] = tr;
+
+        var tdName = document.createElement("td");
+        var swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.backgroundColor = barColors[rd.name] || "#888";
+        if (rd.indent === true || rd.indent === "true") swatch.style.opacity = "0.7";
+        tdName.appendChild(swatch);
+        tdName.appendChild(document.createTextNode(rd.name));
+        if (rd.subcategories) tdName.style.fontWeight = "600";
+        tr.appendChild(tdName);
+
+        var tdVal = document.createElement("td"); tdVal.innerHTML = Portfolio.fmtDollar(rdv); tr.appendChild(tdVal);
+        var tdPct = document.createElement("td"); tdPct.textContent = rdPct.toFixed(1) + "%"; tr.appendChild(tdPct);
+
+        var tdTgt = document.createElement("td");
+        if (rcat) {
+          var inputWrap = document.createElement("div");
+          inputWrap.className = "rebal-target-input-wrap";
+          var inp = document.createElement("input");
+          inp.type = "number";
+          inp.className = "rebal-target-input";
+          inp.min = "0"; inp.max = "100"; inp.step = "1";
+          inp.value = String(liveTargets[rd.name] != null ? liveTargets[rd.name] : rcat.targetPct);
+          var pctSpan = document.createElement("span");
+          pctSpan.className = "rebal-target-pct";
+          pctSpan.textContent = "%";
+          inputWrap.appendChild(inp);
+          inputWrap.appendChild(pctSpan);
+          tdTgt.appendChild(inputWrap);
+          inlineInputs[rd.name] = inp;
+        } else { tdTgt.className = "rebal-dash"; tdTgt.textContent = "\u2014"; }
+        tr.appendChild(tdTgt);
+
+        if (useContribMode) {
+          var ccat = contribByName[rd.name];
+          var tdC5 = document.createElement("td");
+          var tdC6 = document.createElement("td");
+          if (ccat) {
+            var contrib = ccat.contribution;
+            var newCatVal = ccat.currentValue + contrib;
+            var newCatPct = contribResult.newTotal > 0 ? (newCatVal / contribResult.newTotal) * 100 : 0;
+            if (activePanel === "invest") {
+              tdC5.className = contrib > 0.005 ? "rebal-buy" : "rebal-zero";
+              tdC5.innerHTML = Portfolio.fmtDollar(contrib);
+            } else {
+              tdC5.className = contrib < -0.005 ? "rebal-sell" : "rebal-zero";
+              tdC5.innerHTML = Portfolio.fmtDollar(Math.abs(contrib));
+            }
+            tdC6.textContent = fmtPct(newCatPct);
+          } else {
+            tdC5.className = "rebal-dash"; tdC5.textContent = "\u2014";
+            tdC6.className = "rebal-dash"; tdC6.textContent = "\u2014";
+          }
+          tr.appendChild(tdC5);
+          tr.appendChild(tdC6);
+        } else {
+          var tdDiff = document.createElement("td");
+          if (rcat) {
+            var rdiff = rcat.currentPct - rcat.targetPct;
+            tdDiff.className = rdiff > 0.05 ? "rebal-sell" : rdiff < -0.05 ? "rebal-buy" : "rebal-zero";
+            tdDiff.textContent = (rdiff >= 0 ? "+" : "") + fmtPct(rdiff);
+          } else { tdDiff.className = "rebal-dash"; tdDiff.textContent = "\u2014"; }
+          tr.appendChild(tdDiff);
+
+          var tdBs = document.createElement("td");
+          if (rcat) {
+            var rbs = fmtOverUnder(rcat.buySell);
+            tdBs.className = rbs.cls; tdBs.textContent = rbs.text;
+          } else { tdBs.className = "rebal-dash"; tdBs.textContent = "\u2014"; }
+          tr.appendChild(tdBs);
+        }
+
         tbody.appendChild(tr);
-      });
+      }
       catTable.appendChild(tbody);
       var tfoot = document.createElement("tfoot");
-      tfoot.innerHTML = "<tr><td>Total</td><td>" + Portfolio.fmtDollar(result.portfolioTotal) +
-        "</td><td>100.0%</td><td>" + fmtPct(sum) + "</td><td>" +
-        Portfolio.fmtDollar(amount) + "</td><td>" +
-        Portfolio.fmtDollar(result.newTotal) + "</td><td>100.0%</td></tr>";
+      if (useContribMode) {
+        tfoot.innerHTML = "<tr><td>Total</td><td>" + Portfolio.fmtDollar(expTotal) +
+          "</td><td>100.0%</td><td></td><td>" +
+          Portfolio.fmtDollar(Math.abs(contribAmount)) + "</td><td>100.0%</td></tr>";
+      } else {
+        tfoot.innerHTML = "<tr><td>Total</td><td>" + Portfolio.fmtDollar(expTotal) +
+          "</td><td>100.0%</td><td></td><td></td><td></td></tr>";
+      }
       catTable.appendChild(tfoot);
-      contribOutputArea.appendChild(catTable);
+      var catWrap = document.createElement("div");
+      catWrap.className = "wide-table-scroll";
+      catWrap.appendChild(catTable);
+      sharedOutputArea.appendChild(catWrap);
 
-      // Per-ticker table
-      var tickTitle = document.createElement("div");
-      tickTitle.className = "rebal-section-title";
-      tickTitle.textContent = "By Ticker";
-      contribOutputArea.appendChild(tickTitle);
-
-      var tickTable = document.createElement("table");
-      tickTable.className = "rebal-table";
-      var thead2 = document.createElement("thead");
-      thead2.innerHTML = "<tr><th>Ticker</th><th>Current Value</th><th>Current %</th>" +
-        "<th>Buy / Sell</th><th>New Value</th><th>New %</th></tr>";
-      tickTable.appendChild(thead2);
-      var tbody2 = document.createElement("tbody");
-      result.tickers.forEach(function (t) {
-        if (t.currentValue <= 0 && t.contribution === null) return;
-        var buy = t.contribution !== null ? t.contribution : 0;
-        var newTickerValue = t.currentValue + buy;
-        var newTickerPct = result.newTotal > 0 ? (newTickerValue / result.newTotal) * 100 : 0;
-        var tr = document.createElement("tr");
-        var tdSym = document.createElement("td"); tdSym.textContent = t.symbol; tr.appendChild(tdSym);
-        var tdVal = document.createElement("td"); tdVal.innerHTML = Portfolio.fmtDollar(t.currentValue); tr.appendChild(tdVal);
-        var tdPct = document.createElement("td"); tdPct.textContent = fmtPct(t.currentPct); tr.appendChild(tdPct);
-        var tdBuy = document.createElement("td");
-        if (t.contribution === null) {
-          tdBuy.className = "rebal-dash";
-          tdBuy.textContent = "\u2014";
-        } else {
-          tdBuy.className = t.contribution > 0.005 ? "rebal-buy"
-            : t.contribution < -0.005 ? "rebal-sell"
-            : "rebal-zero";
-          tdBuy.innerHTML = Portfolio.fmtDollar(t.contribution);
-        }
-        tr.appendChild(tdBuy);
-        var tdNewVal = document.createElement("td"); tdNewVal.innerHTML = Portfolio.fmtDollar(newTickerValue); tr.appendChild(tdNewVal);
-        var tdNewPct = document.createElement("td"); tdNewPct.textContent = fmtPct(newTickerPct); tr.appendChild(tdNewPct);
-        tbody2.appendChild(tr);
-      });
-      tickTable.appendChild(tbody2);
-      contribOutputArea.appendChild(tickTable);
+      // Wire inline target inputs
+      for (var iname in inlineInputs) {
+        (function(name, input) {
+          input.addEventListener("change", function() {
+            liveTargets[name] = parseFloat(input.value) || 0;
+            renderActivePanel();
+          });
+        })(iname, inlineInputs[iname]);
+      }
     }
 
-    // Wire all inputs
-    cats.forEach(function (rc) {
-      inputs[rc.name].addEventListener("input", function () {
-        renderRebal();
-        renderContrib();
-      });
-    });
-    amountInput.addEventListener("input", renderContrib);
+    // --- Trades render (single function for all three modes) ---
+    function renderTrades() {
+      tradesOutputArea.innerHTML = "";
+      var amount = 0;
+      if (activePanel === "invest") amount = parseFloat(investAmountInput.value) || 0;
+      if (activePanel === "withdraw") amount = -(parseFloat(withdrawAmountInput.value) || 0);
+      var useContribMode = activePanel !== "rebalance";
 
-    renderRebal();
-    renderContrib();
+      // Withdraw validation: warn if amount exceeds the total value of tradeable symbols
+      if (activePanel === "withdraw" && amount < 0) {
+        var latestValues = (fullData && fullData.chartData && fullData.chartData.length > 0)
+          ? (fullData.chartData[fullData.chartData.length - 1].values || {})
+          : {};
+        var tradeableSyms = rebalancingConfig.tradeable || Object.keys(exposureMap);
+        var tradeableTotal = 0;
+        tradeableSyms.forEach(function (sym) { tradeableTotal += latestValues[sym] || 0; });
+        if (-amount > tradeableTotal) {
+          var warn = document.createElement("div");
+          warn.className = "rebal-validation";
+          warn.textContent = "Amount exceeds the total value of sellable assets (" +
+            Portfolio.fmtDollar(tradeableTotal) + ")";
+          tradesOutputArea.appendChild(warn);
+        }
+      }
+
+      var title = document.createElement("div");
+      title.className = "rebal-section-title";
+      title.textContent = "Suggested Trades";
+      tradesOutputArea.appendChild(title);
+
+      if (!useContribMode) {
+        // Rebalance-style table (also shown for Invest/Withdraw with no amount entered)
+        var result = computeRebalancing(fullData, exposureMap, cats, liveTargets, {
+          tradeable: rebalancingConfig.tradeable || null,
+        });
+        var tickTable = document.createElement("table");
+        tickTable.className = "rebal-table";
+        var thead2 = document.createElement("thead");
+        thead2.innerHTML = "<tr><th>Ticker</th><th>Current Value</th><th>Current %</th>" +
+          "<th>Implied Target</th><th>Buy / Sell</th></tr>";
+        tickTable.appendChild(thead2);
+        var tbody2 = document.createElement("tbody");
+        result.tickers.forEach(function (t) {
+          if (t.currentValue <= 0) return;
+          var tr = document.createElement("tr");
+          var tdSym = document.createElement("td"); tdSym.textContent = t.symbol; tr.appendChild(tdSym);
+          var tdVal = document.createElement("td"); tdVal.innerHTML = Portfolio.fmtDollar(t.currentValue); tr.appendChild(tdVal);
+          var tdPct = document.createElement("td"); tdPct.textContent = fmtPct(t.currentPct); tr.appendChild(tdPct);
+          var tdImp = document.createElement("td");
+          if (t.impliedTarget === null) { tdImp.className = "rebal-dash"; tdImp.textContent = "\u2014"; }
+          else { tdImp.innerHTML = Portfolio.fmtDollar(t.impliedTarget); }
+          tr.appendChild(tdImp);
+          var tdBs2 = document.createElement("td");
+          if (t.buySell === null) { tdBs2.className = "rebal-dash"; tdBs2.textContent = "\u2014"; }
+          else { var bs2 = fmtBuySell(t.buySell); tdBs2.className = bs2.cls; tdBs2.textContent = bs2.text; }
+          tr.appendChild(tdBs2);
+          tbody2.appendChild(tr);
+        });
+        tickTable.appendChild(tbody2);
+        var tickWrap1 = document.createElement("div");
+        tickWrap1.className = "wide-table-scroll";
+        tickWrap1.appendChild(tickTable);
+        tradesOutputArea.appendChild(tickWrap1);
+      } else {
+        // Contribution-style table (Invest or Withdraw with amount entered)
+        var result = computeContributions(fullData, exposureMap, cats, liveTargets, amount, {
+          tradeable: rebalancingConfig.tradeable || null,
+        });
+        var col5Header = activePanel === "invest" ? "Buy" : "Sell";
+        var tickTable = document.createElement("table");
+        tickTable.className = "rebal-table";
+        var thead2 = document.createElement("thead");
+        thead2.innerHTML = "<tr><th>Ticker</th><th>Current Value</th><th>Current %</th>" +
+          "<th>" + col5Header + "</th><th>New Value</th><th>New %</th></tr>";
+        tickTable.appendChild(thead2);
+        var tbody2 = document.createElement("tbody");
+        result.tickers.forEach(function (t) {
+          if (t.currentValue <= 0 && t.contribution === null) return;
+          var contrib = t.contribution !== null ? t.contribution : 0;
+          var newTickerValue = t.currentValue + contrib;
+          var newTickerPct = result.newTotal > 0 ? (newTickerValue / result.newTotal) * 100 : 0;
+          var tr = document.createElement("tr");
+          var tdSym = document.createElement("td"); tdSym.textContent = t.symbol; tr.appendChild(tdSym);
+          var tdVal = document.createElement("td"); tdVal.innerHTML = Portfolio.fmtDollar(t.currentValue); tr.appendChild(tdVal);
+          var tdPct = document.createElement("td"); tdPct.textContent = fmtPct(t.currentPct); tr.appendChild(tdPct);
+          var tdContrib = document.createElement("td");
+          if (t.contribution === null) {
+            tdContrib.className = "rebal-dash";
+            tdContrib.textContent = "\u2014";
+          } else if (activePanel === "invest") {
+            tdContrib.className = contrib > 0.005 ? "rebal-buy" : "rebal-zero";
+            tdContrib.innerHTML = Portfolio.fmtDollar(contrib);
+          } else {
+            tdContrib.className = contrib < -0.005 ? "rebal-sell" : "rebal-zero";
+            tdContrib.innerHTML = Portfolio.fmtDollar(Math.abs(contrib));
+          }
+          tr.appendChild(tdContrib);
+          var tdNewVal = document.createElement("td"); tdNewVal.innerHTML = Portfolio.fmtDollar(newTickerValue); tr.appendChild(tdNewVal);
+          var tdNewPct = document.createElement("td"); tdNewPct.textContent = fmtPct(newTickerPct); tr.appendChild(tdNewPct);
+          tbody2.appendChild(tr);
+        });
+        tickTable.appendChild(tbody2);
+        var tickWrap2 = document.createElement("div");
+        tickWrap2.className = "wide-table-scroll";
+        tickWrap2.appendChild(tickTable);
+        tradesOutputArea.appendChild(tickWrap2);
+      }
+    }
+
+    // --- Render both tables ---
+    function renderActivePanel() {
+      renderCategoryTable();
+      renderTrades();
+    }
+
+    function showPanel(name) {
+      activePanel = name;
+      rebalBtn.classList.toggle("active", name === "rebalance");
+      investBtn.classList.toggle("active", name === "invest");
+      withdrawBtn.classList.toggle("active", name === "withdraw");
+      investAmountRow.classList.toggle("hidden", name !== "invest");
+      withdrawAmountRow.classList.toggle("hidden", name !== "withdraw");
+      renderActivePanel();
+    }
+
+    // --- Sub-tab switching ---
+    rebalBtn.addEventListener("click", function () { showPanel("rebalance"); });
+    investBtn.addEventListener("click", function () { showPanel("invest"); });
+    withdrawBtn.addEventListener("click", function () { showPanel("withdraw"); });
+
+    // --- Amount input listeners ---
+    investAmountInput.addEventListener("input", renderActivePanel);
+    withdrawAmountInput.addEventListener("input", renderActivePanel);
+
+    // --- Initial render ---
+    renderActivePanel();
   }
 
   exports.computeRebalancing = computeRebalancing;

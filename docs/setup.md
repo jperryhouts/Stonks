@@ -34,9 +34,9 @@ DATA_DIR=./data node app/serve.js
 
 Open http://localhost:8000.
 
-> **What you get at this point:** A fully functional app with the demo portfolio — all five tabs work. Explore the interface before touching any data file. The next steps replace the demo content with your real holdings.
+> **What you get at this point:** A fully functional app with the demo portfolio — all four tabs work. Explore the interface before touching any data file. The next steps replace the demo content with your real holdings.
 
-> **Minimum setup:** Steps 1 and 2 are all you need to see your real portfolio. The Overview, History, and Gains tabs work with just `trades.json` and `market.csv`. Steps 3–5 add the Analysis tab exposure breakdown, rebalancing calculator, retirement accounts, and formula-driven assets.
+> **Minimum setup:** Steps 1 and 2 are all you need to see your real portfolio. The Overview, History, and Performance tabs work with just `trades.json` and `market.csv`. Steps 3–5 add the Allocation tab exposure breakdown, rebalancing calculator, retirement accounts, and formula-driven assets.
 
 ---
 
@@ -58,7 +58,7 @@ All values are strings. See [Transaction Log](trades.md) for the full format ref
 
 > **Importing from Charles Schwab?** See the [Schwab importer](#importing-from-charles-schwab) section at the bottom of this guide.
 
-> **What you get at this point:** The History tab's Trades sub-tab shows your full transaction history, and the Gains tab shows realized gains. The Overview chart still shows demo prices — the next step fetches market data for your tickers.
+> **What you get at this point:** The History tab's Trades sub-tab shows your full transaction history, and the Performance tab shows realized gains. The Overview chart still shows demo prices — the next step fetches market data for your tickers.
 
 ---
 
@@ -83,13 +83,13 @@ The script reads tickers from `trades.json`, fetches prices, and runs a backfill
 
 > **Note:** If you add a new ticker later, repeat this step — same commands, no extra flags needed.
 
-> **What you get at this point:** The Overview chart fills in with your portfolio's real price history. Gains tab return metrics now use accurate market data.
+> **What you get at this point:** The Overview chart fills in with your portfolio's real price history. Performance tab return metrics now use accurate market data.
 
 ---
 
 ## Step 3: Configure exposure categories
 
-The Overview, History, and Gains tabs all work without any configuration. But to enable the Analysis tab breakdown and the rebalancing calculator, you need a `config.json` that maps your symbols to categories.
+The Overview, History, and Performance tabs all work without any configuration. But to enable the Allocation tab breakdown and the rebalancing calculator, you need a `config.json` that maps your symbols to categories.
 
 The easiest approach: edit `data/config.json` (copied from the demo) to match your holdings — delete entries you don't need and adjust categories as needed.
 
@@ -113,9 +113,9 @@ At minimum, the `config.json` needs an `exposure` section:
 ```
 
 - **`allocations`**: maps each symbol to its categories. Each key is a ticker symbol, and each value is an object mapping category names to fractions. Fractions for a given symbol must sum to 1.0.
-- **`display`**: defines the rows shown in the Analysis tab. Each entry has a name, color (for the donut chart), and the category it represents.
+- **`display`**: defines the rows shown in the "By Category" table in the Allocation tab's Rebalancing sub-tab. Each entry has a name, color (used in the donut chart), and the category it represents.
 
-This is enough to get started. The Analysis tab will show a pie chart and table breaking down your portfolio by these categories.
+This is enough to get started. The Allocation tab's Rebalancing sub-tab will show a donut chart alongside the category breakdown.
 
 ### Fractional exposure (optional)
 
@@ -141,11 +141,11 @@ If you hold both an index fund and an individual stock that's a component of tha
 }
 ```
 
-Now VTI is split: 6.7% of its value counts toward NVDA, and the Analysis tab shows your true NVDA concentration across all holdings. See [Fractional Exposure Tracking](exposure.md) for a full walkthrough.
+Now VTI is split: 6.7% of its value counts toward NVDA, and the Allocation tab shows your true NVDA concentration across all holdings. See [Fractional Exposure Tracking](exposure.md) for a full walkthrough.
 
 ### Rebalancing targets (optional)
 
-To enable the Tools tab rebalancing calculator, add `target` fields to the display rows you want to rebalance against, and a `tradeable` array listing which symbols can be bought/sold:
+To enable the Allocation tab rebalancing calculator, add `target` fields to the display rows you want to rebalance against, and a `tradeable` array listing which symbols can be bought/sold:
 
 ```json
 {
@@ -184,7 +184,7 @@ Target percentages should sum to 100. Only display rows with a `target` field pa
 - **`capitalGains.method`**: `"FIFO"` — default lot matching method for gains tracking. Individual sell trades can also specify a `lotDate` field to select a specific purchase lot by date. See [Transaction Log](trades.md) for details.
 - **`colors`**: chart color palette. Colors cycle when there are more symbols than entries.
 
-> **What you get at this point:** The Analysis tab shows your actual exposure breakdown and donut chart. The Tools tab rebalancing calculator is live.
+> **What you get at this point:** The Allocation tab's Rebalancing sub-tab shows the donut chart, exposure breakdown, and the rebalancing calculator.
 
 ---
 
@@ -211,11 +211,11 @@ If you have employer-sponsored accounts (401k, HSA, 403b) that don't offer daily
 }
 ```
 
-The `contributions` array is the primary way to track a retirement account. Each entry represents capital entering the account (payroll deductions, employer matches). The app starts the account at $0 on the first contribution date and builds daily values by accumulating deposits and scaling with a proxy ticker. Contributions are also required for the Analysis tab's return metrics (TWR/XIRR) — without them, the app can't distinguish investment growth from deposited capital.
+The `contributions` array is the primary way to track a retirement account. Each entry represents capital entering the account (payroll deductions, employer matches). The app starts the account at $0 on the first contribution date and builds daily values by accumulating deposits and scaling with a proxy ticker. Contributions are also required for the Performance tab's return metrics (TWR/XIRR) — without them, the app can't distinguish investment growth from deposited capital.
 
 Ground-truth `values` entries are optional but improve accuracy — they correct drift between the proxy and your account's actual performance. Log in every few weeks and add a new `values` entry to snap the estimate to reality. See [Retirement Accounts](retirement.md) for details.
 
-> **Important:** You also need to add an allocation entry in `config.json` for each retirement account. Without it the account will appear in the Overview and History tabs but will be **excluded from the Analysis tab** and the rebalancing calculator.
+> **Important:** You also need to add an allocation entry in `config.json` for each retirement account. Without it the account will appear in the Overview and History tabs but will be **excluded from the Allocation tab** and the rebalancing calculator.
 
 ```json
 "401k": { "US Stock": 1.0 }
@@ -302,7 +302,7 @@ Other transaction types (journal entries, dividends paid as cash, etc.) are skip
 
 The script is intentionally simple — it's designed for a one-time historical import, not an ongoing sync. Review the output before merging to catch anything that needs manual adjustment.
 
-> **Historical data gaps:** Schwab exports cover up to a 4-year window. If you've held a security for longer than that, the original purchase won't be in the export. The Gains tab will show "Insufficient shares" warnings for those sells — the realized gain calculation will be incomplete for those specific lots, but the rest of the portfolio data will work correctly.
+> **Historical data gaps:** Schwab exports cover up to a 4-year window. If you've held a security for longer than that, the original purchase won't be in the export. The Performance tab will show "Insufficient shares" warnings for those sells — the realized gain calculation will be incomplete for those specific lots, but the rest of the portfolio data will work correctly.
 
 ---
 
@@ -362,8 +362,8 @@ The script edits `retirement.json` in-place, adding or updating entries in the `
 - If you see a `SyntaxError` mentioning `type | None`, your Python version is too old — 3.10+ is required.
 - If you see `"Failed to fetch prices for: FXAIX"` (or another mutual fund ticker), the fetcher doesn't support mutual fund symbols. Change the proxy to an equivalent ETF — e.g. `SPY` or `VOO` instead of `FXAIX`, `VTI` instead of `VTSAX`.
 
-**Retirement account not appearing in the Analysis tab**
-- The account needs an allocation entry in `config.json` → `exposure.allocations`. Without it the account is visible in Overview/History but excluded from Analysis. See [Step 3](#step-3-configure-exposure-categories).
+**Retirement account not appearing in the Allocation tab**
+- The account needs an allocation entry in `config.json` → `exposure.allocations`. Without it the account is visible in Overview/History but excluded from the Allocation tab. See [Step 3](#step-3-configure-exposure-categories).
 
 **Docker: permission denied errors**
 - The web container runs as the UID/GID specified in `.env` (default 1000:1000). Set `UID` and `GID` to match the owner of your data directory (run `id -u` and `id -g` to find your values), then rebuild with `docker compose build web`. Alternatively, run `chown -R 1000:1000 <your-DATA_DIR>` to match the defaults.
