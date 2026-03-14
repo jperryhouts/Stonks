@@ -24,7 +24,6 @@ var EXPOSURE_DISPLAY = [];
 var SYMBOL_ORDER = [];
 var REBALANCING_CONFIG = { categories: [], targets: {}, tradeable: null };
 var MARGIN_LOAN_DISPLAY = "proportional";
-var ANALYSIS_WINDOW = "1Y";
 var GAINS_WINDOW = "YTD";
 
 var PAD = { top: 12, right: 8, bottom: 28, left: 72 };
@@ -1063,241 +1062,9 @@ function drawExposureChart(wrap, rows, barColors, total, onHighlight) {
 function buildExposurePanel(data, trades, retirement, assets) {
   var container = document.getElementById("panel-exposure");
 
-  // --- Time window dropdown ---
-  var header = document.createElement("div");
-  header.className = "analysis-header";
-
-  var sel = document.createElement("select");
-  sel.className = "analysis-window-select";
-  var prevYearLabel = String(new Date().getFullYear() - 1);
-  ["1M", "90D", "YTD", "PREV_YEAR", "1Y", "2Y", "All"].forEach(function (w) {
-    var opt = document.createElement("option");
-    opt.value = w;
-    opt.textContent = w === "90D" ? "90 Days" : w === "1M" ? "1 Month" :
-      w === "YTD" ? "YTD" : w === "PREV_YEAR" ? prevYearLabel :
-      w === "1Y" ? "1 Year" : w === "2Y" ? "2 Years" : "All";
-    if (w === ANALYSIS_WINDOW) opt.selected = true;
-    sel.appendChild(opt);
-  });
-  header.appendChild(sel);
-
-  // --- Return metrics section ---
-  var metricsEl = document.createElement("div");
-  metricsEl.className = "analysis-metrics";
-
-  var expandedMetricGroups = {}; // group name → true when expanded
-
-  function renderMetrics() {
-    var cd = data.chartData;
-    if (cd.length === 0) { metricsEl.innerHTML = ""; return; }
-
-    var last = cd[cd.length - 1].date;
-    var cutoff;
-    if (ANALYSIS_WINDOW === "All") {
-      cutoff = cd[0].date;
-    } else if (ANALYSIS_WINDOW === "YTD") {
-      cutoff = last.slice(0, 4) + "-01-01";
-    } else if (ANALYSIS_WINDOW === "PREV_YEAR") {
-      var prevYear = String(parseInt(last.slice(0, 4), 10) - 1);
-      cutoff = prevYear + "-01-01";
-      last = prevYear + "-12-31";
-    } else {
-      var dayMap = { "1M": 30, "90D": 90, "1Y": 365, "2Y": 730 };
-      var d = new Date(last);
-      d.setDate(d.getDate() - (dayMap[ANALYSIS_WINDOW] || 365));
-      cutoff = d.toISOString().slice(0, 10);
-    }
-
-    // Build symbol groupings: retirement accounts and mortgage assets get separate treatment
-    var retirementNamesMap = {};
-    if (retirement && retirement.accounts) {
-      for (var ri = 0; ri < retirement.accounts.length; ri++) {
-        retirementNamesMap[retirement.accounts[ri].name] = true;
-      }
-    }
-    var mortgageNamesMap = {};
-    if (assets) {
-      for (var ai = 0; ai < assets.length; ai++) {
-        if (assets[ai].type === "mortgage") mortgageNamesMap[assets[ai].name] = true;
-      }
-    }
-    var brokerageSymbols = [];
-    for (var bsi = 0; bsi < data.symbols.length; bsi++) {
-      var bsym = data.symbols[bsi];
-      if (!retirementNamesMap[bsym] && !mortgageNamesMap[bsym]) brokerageSymbols.push(bsym);
-    }
-
-    // Build a synthetic [{date, total}] slice using only the given symbols
-    function makeSlice(symbols) {
-      var result = [];
-      for (var i = 0; i < cd.length; i++) {
-        var total = 0;
-        for (var j = 0; j < symbols.length; j++) total += cd[i].values[symbols[j]] || 0;
-        result.push({ date: cd[i].date, total: total });
-      }
-      return result;
-    }
-
-    // Groups: brokerage investments first, then each retirement account.
-    var bt = trades || [];
-    var groups = [{ name: "Investments", symbols: brokerageSymbols, trades: bt }];
-    if (retirement && retirement.accounts) {
-      for (var gi = 0; gi < retirement.accounts.length; gi++) {
-        var acct = retirement.accounts[gi];
-        var acctTrades = [];
-        if (retirement.contributions) {
-          for (var ci = 0; ci < retirement.contributions.length; ci++) {
-            var contrib = retirement.contributions[ci];
-            if (contrib.account !== acct.name) continue;
-            acctTrades.push({ date: contrib.date, quantity: "1", price: String(contrib.amount).replace(/,/g, ""), type: "buy" });
-          }
-        }
-        groups.push({ name: acct.name, symbols: [acct.name], trades: acctTrades });
-      }
-    }
-
-    function fmt(v) {
-      if (v === null || !isFinite(v)) return "\u2014";
-      var sign = v >= 0 ? "+" : "";
-      return sign + (v * 100).toFixed(1) + "%";
-    }
-
-    metricsEl.innerHTML = "";
-    var table = document.createElement("table");
-    table.className = "analysis-metrics-table";
-
-    function makeMetricTd(val) {
-      var td = document.createElement("td");
-      td.className = "analysis-metric-value";
-      td.textContent = fmt(val);
-      if (val !== null && isFinite(val)) {
-        td.style.color = val >= 0 ? "#16a34a" : "#dc2626";
-      }
-      return td;
-    }
-
-    function getActiveSymbols(symbols, windowStart, windowEnd) {
-      var active = {};
-      for (var i = 0; i < cd.length; i++) {
-        var dt = cd[i].date;
-        if (dt < windowStart || dt > windowEnd) continue;
-        for (var j = 0; j < symbols.length; j++) {
-          if ((cd[i].values[symbols[j]] || 0) > 0) active[symbols[j]] = true;
-        }
-      }
-      return symbols.filter(function(s) { return active[s]; });
-    }
-
-    // Two-row thead: group headers + column sub-headers
-    var thead = document.createElement("thead");
-
-    var hdr1 = document.createElement("tr");
-    var thLabel = document.createElement("th");
-    thLabel.className = "analysis-metric-label";
-    thLabel.setAttribute("rowspan", "2");
-    hdr1.appendChild(thLabel);
-    var thAnn = document.createElement("th");
-    thAnn.className = "analysis-metric-group-header";
-    thAnn.setAttribute("colspan", "2");
-    thAnn.textContent = "Annualized";
-    hdr1.appendChild(thAnn);
-    var thCum = document.createElement("th");
-    thCum.className = "analysis-metric-group-header";
-    thCum.setAttribute("colspan", "2");
-    thCum.textContent = "Cumulative";
-    hdr1.appendChild(thCum);
-    thead.appendChild(hdr1);
-
-    var hdr2 = document.createElement("tr");
-    ["TWR", "XIRR", "TWR", "XIRR"].forEach(function(h) {
-      var th = document.createElement("th");
-      th.className = "analysis-metric-value";
-      th.textContent = h;
-      hdr2.appendChild(th);
-    });
-    thead.appendChild(hdr2);
-    table.appendChild(thead);
-
-    var tbody = document.createElement("tbody");
-
-    groups.forEach(function(group) {
-      var isExpandable = group.symbols.length > 1;
-      var slice = makeSlice(group.symbols);
-      var result = computeReturns(slice, group.trades, cutoff, last);
-
-      var tr = document.createElement("tr");
-      var tdLabel = document.createElement("td");
-      tdLabel.className = "analysis-metric-label";
-
-      var btn;
-      if (isExpandable) {
-        btn = document.createElement("button");
-        btn.textContent = "+";
-        btn.className = "gains-expand-btn";
-        tdLabel.appendChild(btn);
-      }
-      tdLabel.appendChild(document.createTextNode(group.name));
-      tr.appendChild(tdLabel);
-      tr.appendChild(makeMetricTd(result.twr));
-      tr.appendChild(makeMetricTd(result.xirr));
-      tr.appendChild(makeMetricTd(result.twrCumulative));
-      tr.appendChild(makeMetricTd(result.xirrCumulative));
-      tbody.appendChild(tr);
-
-      if (isExpandable) {
-        var activeSyms = getActiveSymbols(group.symbols, cutoff, last);
-        var subRows = [];
-
-        activeSyms.forEach(function(sym) {
-          var symSlice = makeSlice([sym]);
-          var symTrades = (group.trades || []).filter(function(t) { return t.symbol === sym; });
-          var symResult = computeReturns(symSlice, symTrades, cutoff, last);
-
-          var subTr = document.createElement("tr");
-          subTr.className = "analysis-metrics-sub-row hidden";
-          var subLabel = document.createElement("td");
-          subLabel.className = "analysis-metric-label analysis-metric-sub-label";
-          subLabel.textContent = sym;
-          subTr.appendChild(subLabel);
-          subTr.appendChild(makeMetricTd(symResult.twr));
-          subTr.appendChild(makeMetricTd(symResult.xirr));
-          subTr.appendChild(makeMetricTd(symResult.twrCumulative));
-          subTr.appendChild(makeMetricTd(symResult.xirrCumulative));
-          tbody.appendChild(subTr);
-          subRows.push(subTr);
-        });
-
-        (function(expandBtn, rows, groupName) {
-          if (expandedMetricGroups[groupName]) {
-            rows.forEach(function(r) { r.classList.remove("hidden"); });
-            expandBtn.textContent = "\u2212";
-          }
-          expandBtn.addEventListener("click", function() {
-            var expanded = expandBtn.textContent === "\u2212";
-            rows.forEach(function(r) { r.classList.toggle("hidden", expanded); });
-            expandBtn.textContent = expanded ? "+" : "\u2212";
-            expandedMetricGroups[groupName] = !expanded;
-          });
-        })(btn, subRows, group.name);
-      }
-    });
-
-    table.appendChild(tbody);
-    metricsEl.appendChild(table);
-  }
-
-  renderMetrics();
-
-  sel.addEventListener("change", function () {
-    ANALYSIS_WINDOW = sel.value;
-    renderMetrics();
-  });
-
   // --- Existing exposure content ---
   var exp = computeExposure(data);
   if (!exp) {
-    container.appendChild(header);
-    container.appendChild(metricsEl);
     return;
   }
 
@@ -1427,15 +1194,13 @@ function buildExposurePanel(data, trades, retirement, assets) {
     container.appendChild(notice);
   }
 
-  container.appendChild(header);
-  container.appendChild(metricsEl);
 }
 
 // ---------------------------------------------------------------------------
 // Gains panel
 // ---------------------------------------------------------------------------
 
-function buildGainsPanel(gainsData) {
+function buildGainsPanel(gainsData, data, trades, retirement, assets) {
   var container = document.getElementById("panel-gains");
   container.innerHTML = "";
 
@@ -1458,7 +1223,7 @@ function buildGainsPanel(gainsData) {
 
   var realizedBtn = document.createElement("button");
   realizedBtn.className = "tools-subtab active";
-  realizedBtn.textContent = "Realized & Donations";
+  realizedBtn.textContent = "Realized";
 
   var unrealizedBtn = document.createElement("button");
   unrealizedBtn.className = "tools-subtab";
@@ -1509,8 +1274,204 @@ function buildGainsPanel(gainsData) {
   var realizedContent = document.createElement("div");
   realizedPanel.appendChild(realizedContent);
 
+  var expandedMetricGroups = {};
+
   function renderRealizedSections(win) {
     realizedContent.innerHTML = "";
+
+    // -- Performance metrics --
+    if (data && data.chartData && data.chartData.length > 0) {
+      var cd = data.chartData;
+      var metricsLast = cd[cd.length - 1].date;
+      var metricsCutoff;
+      if (win === "All") {
+        metricsCutoff = cd[0].date;
+      } else if (win === "YTD") {
+        metricsCutoff = metricsLast.slice(0, 4) + "-01-01";
+      } else if (win === "PREV_YEAR") {
+        var mprevYear = String(parseInt(metricsLast.slice(0, 4), 10) - 1);
+        metricsCutoff = mprevYear + "-01-01";
+        metricsLast = mprevYear + "-12-31";
+      } else {
+        var mdayMap = { "1M": 30, "90D": 90, "1Y": 365, "2Y": 730 };
+        var md = new Date(metricsLast);
+        md.setDate(md.getDate() - (mdayMap[win] || 365));
+        metricsCutoff = md.toISOString().slice(0, 10);
+      }
+
+      var retirementNamesMap = {};
+      if (retirement && retirement.accounts) {
+        for (var mri = 0; mri < retirement.accounts.length; mri++) {
+          retirementNamesMap[retirement.accounts[mri].name] = true;
+        }
+      }
+      var mortgageNamesMap = {};
+      if (assets) {
+        for (var mai = 0; mai < assets.length; mai++) {
+          if (assets[mai].type === "mortgage") mortgageNamesMap[assets[mai].name] = true;
+        }
+      }
+      var brokerageSymbols = [];
+      for (var mbsi = 0; mbsi < data.symbols.length; mbsi++) {
+        var mbsym = data.symbols[mbsi];
+        if (!retirementNamesMap[mbsym] && !mortgageNamesMap[mbsym]) brokerageSymbols.push(mbsym);
+      }
+
+      function makeSlice(symbols) {
+        var result = [];
+        for (var i = 0; i < cd.length; i++) {
+          var total = 0;
+          for (var j = 0; j < symbols.length; j++) total += cd[i].values[symbols[j]] || 0;
+          result.push({ date: cd[i].date, total: total });
+        }
+        return result;
+      }
+
+      var mbt = trades || [];
+      var mgroups = [{ name: "Investments", symbols: brokerageSymbols, trades: mbt }];
+      if (retirement && retirement.accounts) {
+        for (var mgi = 0; mgi < retirement.accounts.length; mgi++) {
+          var macct = retirement.accounts[mgi];
+          var macctTrades = [];
+          if (retirement.contributions) {
+            for (var mci = 0; mci < retirement.contributions.length; mci++) {
+              var mcontrib = retirement.contributions[mci];
+              if (mcontrib.account !== macct.name) continue;
+              macctTrades.push({ date: mcontrib.date, quantity: "1", price: String(mcontrib.amount).replace(/,/g, ""), type: "buy" });
+            }
+          }
+          mgroups.push({ name: macct.name, symbols: [macct.name], trades: macctTrades });
+        }
+      }
+
+      function mfmt(v) {
+        if (v === null || !isFinite(v)) return "\u2014";
+        var sign = v >= 0 ? "+" : "";
+        return sign + (v * 100).toFixed(1) + "%";
+      }
+
+      function makeMetricTd(val) {
+        var td = document.createElement("td");
+        td.className = "analysis-metric-value";
+        td.textContent = mfmt(val);
+        if (val !== null && isFinite(val)) {
+          td.style.color = val >= 0 ? "#16a34a" : "#dc2626";
+        }
+        return td;
+      }
+
+      function getActiveSymbols(symbols, windowStart, windowEnd) {
+        var active = {};
+        for (var i = 0; i < cd.length; i++) {
+          var dt = cd[i].date;
+          if (dt < windowStart || dt > windowEnd) continue;
+          for (var j = 0; j < symbols.length; j++) {
+            if ((cd[i].values[symbols[j]] || 0) > 0) active[symbols[j]] = true;
+          }
+        }
+        return symbols.filter(function(s) { return active[s]; });
+      }
+
+      var metricsEl = document.createElement("div");
+      metricsEl.className = "analysis-metrics";
+      var mtable = document.createElement("table");
+      mtable.className = "analysis-metrics-table";
+
+      var mthead = document.createElement("thead");
+      var mhdr1 = document.createElement("tr");
+      var mthLabel = document.createElement("th");
+      mthLabel.className = "analysis-metric-label";
+      mthLabel.setAttribute("rowspan", "2");
+      mhdr1.appendChild(mthLabel);
+      var mthAnn = document.createElement("th");
+      mthAnn.className = "analysis-metric-group-header";
+      mthAnn.setAttribute("colspan", "2");
+      mthAnn.textContent = "Annualized";
+      mhdr1.appendChild(mthAnn);
+      var mthCum = document.createElement("th");
+      mthCum.className = "analysis-metric-group-header";
+      mthCum.setAttribute("colspan", "2");
+      mthCum.textContent = "Cumulative";
+      mhdr1.appendChild(mthCum);
+      mthead.appendChild(mhdr1);
+
+      var mhdr2 = document.createElement("tr");
+      ["TWR", "XIRR", "TWR", "XIRR"].forEach(function(h) {
+        var th = document.createElement("th");
+        th.className = "analysis-metric-value";
+        th.textContent = h;
+        mhdr2.appendChild(th);
+      });
+      mthead.appendChild(mhdr2);
+      mtable.appendChild(mthead);
+
+      var mtbody = document.createElement("tbody");
+      mgroups.forEach(function(group) {
+        var isExpandable = group.symbols.length > 1;
+        var slice = makeSlice(group.symbols);
+        var result = computeReturns(slice, group.trades, metricsCutoff, metricsLast);
+
+        var tr = document.createElement("tr");
+        var tdLabel = document.createElement("td");
+        tdLabel.className = "analysis-metric-label";
+
+        var btn;
+        if (isExpandable) {
+          btn = document.createElement("button");
+          btn.textContent = "+";
+          btn.className = "gains-expand-btn";
+          tdLabel.appendChild(btn);
+        }
+        tdLabel.appendChild(document.createTextNode(group.name));
+        tr.appendChild(tdLabel);
+        tr.appendChild(makeMetricTd(result.twr));
+        tr.appendChild(makeMetricTd(result.xirr));
+        tr.appendChild(makeMetricTd(result.twrCumulative));
+        tr.appendChild(makeMetricTd(result.xirrCumulative));
+        mtbody.appendChild(tr);
+
+        if (isExpandable) {
+          var activeSyms = getActiveSymbols(group.symbols, metricsCutoff, metricsLast);
+          var subRows = [];
+
+          activeSyms.forEach(function(sym) {
+            var symSlice = makeSlice([sym]);
+            var symTrades = (group.trades || []).filter(function(t) { return t.symbol === sym; });
+            var symResult = computeReturns(symSlice, symTrades, metricsCutoff, metricsLast);
+
+            var subTr = document.createElement("tr");
+            subTr.className = "analysis-metrics-sub-row hidden";
+            var subLabel = document.createElement("td");
+            subLabel.className = "analysis-metric-label analysis-metric-sub-label";
+            subLabel.textContent = sym;
+            subTr.appendChild(subLabel);
+            subTr.appendChild(makeMetricTd(symResult.twr));
+            subTr.appendChild(makeMetricTd(symResult.xirr));
+            subTr.appendChild(makeMetricTd(symResult.twrCumulative));
+            subTr.appendChild(makeMetricTd(symResult.xirrCumulative));
+            mtbody.appendChild(subTr);
+            subRows.push(subTr);
+          });
+
+          (function(expandBtn, rows, groupName) {
+            if (expandedMetricGroups[groupName]) {
+              rows.forEach(function(r) { r.classList.remove("hidden"); });
+              expandBtn.textContent = "\u2212";
+            }
+            expandBtn.addEventListener("click", function() {
+              var expanded = expandBtn.textContent === "\u2212";
+              rows.forEach(function(r) { r.classList.toggle("hidden", expanded); });
+              expandBtn.textContent = expanded ? "+" : "\u2212";
+              expandedMetricGroups[groupName] = !expanded;
+            });
+          })(btn, subRows, group.name);
+        }
+      });
+
+      mtable.appendChild(mtbody);
+      metricsEl.appendChild(mtable);
+      realizedContent.appendChild(metricsEl);
+    }
 
     // Compute cutoff / endDate
     var today = new Date().toISOString().slice(0, 10);
@@ -2336,7 +2297,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         buildHistoryTable(fullData, retirement, rebuildAll, trades, tickers);
         document.getElementById("panel-exposure").innerHTML = "";
         buildExposurePanel(fullData, trades, retirement, assets);
-        buildGainsPanel(gainsData);
+        buildGainsPanel(gainsData, fullData, trades, retirement, assets);
         buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG);
         showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
       });
@@ -2365,7 +2326,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   updateDetail(state.data, state.data.chartData.length - 1);
   buildHistoryTable(fullData, retirement, rebuildAll, trades, marketTickers);
   buildExposurePanel(fullData, trades, retirement, assets);
-  buildGainsPanel(gainsData);
+  buildGainsPanel(gainsData, fullData, trades, retirement, assets);
   buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG);
   showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
   attachListeners(canvas, state, chartRef);

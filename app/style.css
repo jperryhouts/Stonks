@@ -1,5 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html { overflow-x: hidden; } /* prevent viewport-level horizontal scroll */
+
 body {
     font-family: system-ui, -apple-system, sans-serif;
     max-width: 720px;
@@ -7,7 +9,6 @@ body {
     padding: 1rem;
     color: #1a1a1a;
     background: #fafafa;
-    overflow-x: hidden;
 }
 
 main { line-height: 1.5; }
@@ -232,13 +233,18 @@ main { line-height: 1.5; }
 /* History table */
 
 .history-balances {
+    /* Expand to full viewport width so the table can use available space.
+       calc(-50vw + 50%) offsets the body's max-width centering and padding. */
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
     overflow-x: auto;
     overflow-y: clip; /* avoid implicit overflow-y:auto which would break sticky thead */
     -webkit-overflow-scrolling: touch;
 }
 
 #history-table {
-    width: 100%;
+    width: max-content; /* natural width; centered when narrower than viewport */
+    margin: 0 auto;
     border-collapse: collapse;
     font-size: 0.8125rem;
     font-variant-numeric: tabular-nums;
@@ -650,6 +656,7 @@ main { line-height: 1.5; }
 .gains-table td {
     text-align: left;
     padding: 0.3rem 0.6rem;
+    white-space: nowrap;
 }
 
 .gains-table th.gains-num,
