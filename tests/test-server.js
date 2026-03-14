@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { csvToJson, prettyJson, validateTrades, normalizeTrades, getIP, serverLog, serverWarn } = require("../app/serve.js");
+const { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, getIP, serverLog, serverWarn } = require("../app/serve.js");
 
 // ---------------------------------------------------------------------------
 // csvToJson
@@ -297,5 +297,154 @@ describe("serverWarn", () => {
     }
     assert.equal(lines.length, 1);
     assert.match(lines[0], /^WARN \[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\] 1\.2\.3\.4 - bad password: "hunter2"$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateRetirement
+// ---------------------------------------------------------------------------
+
+describe("validateRetirement", () => {
+  const validBody = () => ({
+    accounts: [{ name: "401k", proxy: "VTI" }],
+    values: [{ date: "2024-01-01", account: "401k", value: "12500" }],
+    contributions: [{ date: "2024-01-01", account: "401k", amount: "1000" }],
+  });
+
+  it("returns null for a valid body", () => {
+    assert.equal(validateRetirement(validBody()), null);
+  });
+
+  it("returns null when contributions is absent", () => {
+    const body = validBody();
+    delete body.contributions;
+    assert.equal(validateRetirement(body), null);
+  });
+
+  it("returns null for empty accounts, values, and contributions arrays", () => {
+    assert.equal(validateRetirement({ accounts: [], values: [], contributions: [] }), null);
+  });
+
+  it("rejects null input", () => {
+    assert.ok(validateRetirement(null));
+  });
+
+  it("rejects array input", () => {
+    assert.ok(validateRetirement([]));
+  });
+
+  it("rejects non-object input", () => {
+    assert.ok(validateRetirement("string"));
+  });
+
+  it("rejects missing accounts array", () => {
+    const body = validBody();
+    delete body.accounts;
+    assert.match(validateRetirement(body), /accounts/);
+  });
+
+  it("rejects missing values array", () => {
+    const body = validBody();
+    delete body.values;
+    assert.match(validateRetirement(body), /values/);
+  });
+
+  // accounts
+  it("rejects account with missing name", () => {
+    const body = validBody();
+    body.accounts[0].name = "";
+    assert.match(validateRetirement(body), /Account 1.*name/);
+  });
+
+  it("rejects account with whitespace-only name", () => {
+    const body = validBody();
+    body.accounts[0].name = "   ";
+    assert.match(validateRetirement(body), /Account 1.*name/);
+  });
+
+  // values
+  it("rejects value with missing date", () => {
+    const body = validBody();
+    body.values[0].date = "";
+    assert.match(validateRetirement(body), /Value 1.*date/);
+  });
+
+  it("rejects value with wrong date format", () => {
+    const body = validBody();
+    body.values[0].date = "01/01/2024";
+    assert.match(validateRetirement(body), /Value 1.*date/);
+  });
+
+  it("rejects value with missing account", () => {
+    const body = validBody();
+    body.values[0].account = "";
+    assert.match(validateRetirement(body), /Value 1.*account/);
+  });
+
+  it("rejects value with zero value", () => {
+    const body = validBody();
+    body.values[0].value = "0";
+    assert.match(validateRetirement(body), /Value 1.*value/);
+  });
+
+  it("rejects value with non-numeric value", () => {
+    const body = validBody();
+    body.values[0].value = "abc";
+    assert.match(validateRetirement(body), /Value 1.*value/);
+  });
+
+  it("rejects value with negative value", () => {
+    const body = validBody();
+    body.values[0].value = "-100";
+    assert.match(validateRetirement(body), /Value 1.*value/);
+  });
+
+  it("reports the correct row number for a second invalid value", () => {
+    const body = validBody();
+    body.values.push({ date: "bad", account: "401k", value: "500" });
+    assert.match(validateRetirement(body), /Value 2.*date/);
+  });
+
+  // contributions
+  it("rejects contribution with missing date", () => {
+    const body = validBody();
+    body.contributions[0].date = "";
+    assert.match(validateRetirement(body), /Contribution 1.*date/);
+  });
+
+  it("rejects contribution with wrong date format", () => {
+    const body = validBody();
+    body.contributions[0].date = "2024/01/01";
+    assert.match(validateRetirement(body), /Contribution 1.*date/);
+  });
+
+  it("rejects contribution with missing account", () => {
+    const body = validBody();
+    body.contributions[0].account = "";
+    assert.match(validateRetirement(body), /Contribution 1.*account/);
+  });
+
+  it("rejects contribution with zero amount", () => {
+    const body = validBody();
+    body.contributions[0].amount = "0";
+    assert.match(validateRetirement(body), /Contribution 1.*amount/);
+  });
+
+  it("rejects contribution with non-numeric amount", () => {
+    const body = validBody();
+    body.contributions[0].amount = "abc";
+    assert.match(validateRetirement(body), /Contribution 1.*amount/);
+  });
+
+  it("rejects contribution with negative amount", () => {
+    const body = validBody();
+    body.contributions[0].amount = "-500";
+    assert.match(validateRetirement(body), /Contribution 1.*amount/);
+  });
+
+  it("reports the correct row number for a second invalid contribution", () => {
+    const body = validBody();
+    body.contributions.push({ date: "2024-06-01", account: "", amount: "500" });
+    assert.match(validateRetirement(body), /Contribution 2.*account/);
   });
 });

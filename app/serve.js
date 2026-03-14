@@ -279,6 +279,39 @@ function validateTrades(arr) {
     return null;
 }
 
+/** Validate retirement body. Returns error string or null. */
+function validateRetirement(body) {
+    if (!body || typeof body !== "object" || Array.isArray(body))
+        return "Expected an object with accounts and values";
+    if (!Array.isArray(body.accounts)) return "accounts must be an array";
+    if (!Array.isArray(body.values)) return "values must be an array";
+    for (let i = 0; i < body.accounts.length; i++) {
+        const a = body.accounts[i];
+        if (!a.name || typeof a.name !== "string" || a.name.trim() === "")
+            return `Account ${i + 1}: name is required`;
+    }
+    for (let i = 0; i < body.values.length; i++) {
+        const v = body.values[i];
+        if (!v.date || !/^\d{4}-\d{2}-\d{2}$/.test(v.date))
+            return `Value ${i + 1}: invalid date (expected YYYY-MM-DD)`;
+        if (!v.account || typeof v.account !== "string" || v.account.trim() === "")
+            return `Value ${i + 1}: account is required`;
+        if (v.value === "" || !isFinite(Number(v.value)) || Number(v.value) <= 0)
+            return `Value ${i + 1}: invalid value (must be positive number)`;
+    }
+    const contributions = Array.isArray(body.contributions) ? body.contributions : [];
+    for (let i = 0; i < contributions.length; i++) {
+        const c = contributions[i];
+        if (!c.date || !/^\d{4}-\d{2}-\d{2}$/.test(c.date))
+            return `Contribution ${i + 1}: invalid date (expected YYYY-MM-DD)`;
+        if (!c.account || typeof c.account !== "string" || c.account.trim() === "")
+            return `Contribution ${i + 1}: account is required`;
+        if (c.amount === "" || !isFinite(Number(c.amount)) || Number(c.amount) <= 0)
+            return `Contribution ${i + 1}: invalid amount (must be positive number)`;
+    }
+    return null;
+}
+
 const server = http.createServer(async (req, res) => {
     const ip = getIP(req);
     if (!checkAuth(req, res, ip)) return;
@@ -331,37 +364,14 @@ const server = http.createServer(async (req, res) => {
     if (pathname === "/api/retirement" && req.method === "POST") {
         try {
             const body = await readBody(req);
-            if (!body || typeof body !== "object" || Array.isArray(body)) {
+            const retirementErr = validateRetirement(body);
+            if (retirementErr) {
                 res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" });
-                res.end(JSON.stringify({ error: "Expected an object with accounts and values" }));
+                res.end(JSON.stringify({ error: retirementErr }));
                 return;
             }
             const accounts = body.accounts;
             const values = body.values;
-            if (!Array.isArray(accounts)) {
-                res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" });
-                res.end(JSON.stringify({ error: "accounts must be an array" }));
-                return;
-            }
-            if (!Array.isArray(values)) {
-                res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" });
-                res.end(JSON.stringify({ error: "values must be an array" }));
-                return;
-            }
-            for (let i = 0; i < accounts.length; i++) {
-                const a = accounts[i];
-                if (!a.name || typeof a.name !== "string" || a.name.trim() === "")
-                    { res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" }); res.end(JSON.stringify({ error: `Account ${i + 1}: name is required` })); return; }
-            }
-            for (let i = 0; i < values.length; i++) {
-                const v = values[i];
-                if (!v.date || !/^\d{4}-\d{2}-\d{2}$/.test(v.date))
-                    { res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" }); res.end(JSON.stringify({ error: `Value ${i + 1}: invalid date (expected YYYY-MM-DD)` })); return; }
-                if (!v.account || typeof v.account !== "string" || v.account.trim() === "")
-                    { res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" }); res.end(JSON.stringify({ error: `Value ${i + 1}: account is required` })); return; }
-                if (v.value === "" || !isFinite(Number(v.value)) || Number(v.value) <= 0)
-                    { res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" }); res.end(JSON.stringify({ error: `Value ${i + 1}: invalid value (must be positive number)` })); return; }
-            }
             const contributions = Array.isArray(body.contributions) ? body.contributions : [];
             const cleanAccounts = accounts.map(a => ({
                 name: a.name.trim(),
@@ -379,8 +389,8 @@ const server = http.createServer(async (req, res) => {
             });
             const cleanContributions = contributions.map(c => ({
                 date: c.date,
-                account: c.account,
-                amount: c.amount,
+                account: c.account.trim(),
+                amount: String(Number(c.amount)),
             }));
             cleanContributions.sort((a, b) => {
                 if (a.date !== b.date) return a.date > b.date ? -1 : 1;
@@ -486,4 +496,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { csvToJson, prettyJson, validateTrades, normalizeTrades, getIP, serverLog, serverWarn };
+module.exports = { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, getIP, serverLog, serverWarn };
