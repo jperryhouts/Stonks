@@ -169,6 +169,13 @@ function serverLog(ip, msg) {
     console.log(`[${ts}] ${ip} - ${msg}`);
 }
 
+/** Write content to filePath atomically via a .tmp file + rename. */
+function writeFileAtomic(filePath, content) {
+    const tmp = filePath + ".tmp";
+    fs.writeFileSync(tmp, content);
+    fs.renameSync(tmp, filePath);
+}
+
 /** Log a timestamped warning to stderr. */
 function serverWarn(ip, msg) {
     const ts = new Date().toISOString();
@@ -308,7 +315,7 @@ const server = http.createServer(async (req, res) => {
             // Normalize values
             const clean = normalizeTrades(body);
             // Write JSON directly — no rebuild needed
-            fs.writeFileSync(path.join(DATA_DIR, "trades.json"), prettyJson(clean));
+            writeFileAtomic(path.join(DATA_DIR, "trades.json"), prettyJson(clean));
             res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true, rows: clean.length }));
         } catch (e) {
@@ -384,7 +391,7 @@ const server = http.createServer(async (req, res) => {
                 values: cleanValues,
                 contributions: cleanContributions,
             };
-            fs.writeFileSync(path.join(DATA_DIR, "retirement.json"), prettyJson(clean));
+            writeFileAtomic(path.join(DATA_DIR, "retirement.json"), prettyJson(clean));
             res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true, values: clean.values.length }));
         } catch (e) {

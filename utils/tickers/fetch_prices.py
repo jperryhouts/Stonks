@@ -390,16 +390,18 @@ def write_to_csv(
     rows.sort(key=lambda r: r.get("timestamp", "")[:10])
     fieldnames = ["timestamp"] + all_tickers
 
+    tmp_path = path + ".tmp"
     try:
         parent = os.path.dirname(path)
         if parent:
             os.makedirs(parent, exist_ok=True)
-        with open(path, "w", newline="") as f:
+        with open(tmp_path, "w", newline="") as f:
             writer = csv.DictWriter(
                 f, fieldnames=fieldnames, restval="", lineterminator="\n"
             )
             writer.writeheader()
             writer.writerows(rows)
+        os.replace(tmp_path, path)
     except OSError:
         log.exception("Failed to write to %s", path)
         return False
