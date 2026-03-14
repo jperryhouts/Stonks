@@ -36,12 +36,12 @@ The `type` field determines the transaction type. Quantity is always positive �
 { "date": "2024-12-01", "symbol": "VTI", "price": "290.00", "quantity": "2", "type": "donate" }
 ```
 
-You can also add a `note` field to any trade for your own reference — it's displayed in the Trades tab but doesn't affect calculations.
+You can also add a `note` field to any trade for your own reference — it's displayed in the Trades sub-tab but doesn't affect calculations.
 
 ## Tips
 
 - Enter trades in chronological order (the app sorts them, but it's easier to read)
-- Once the server is running, you can edit trades through the Trades tab in the browser, which saves back to the server via `POST /api/trades`
+- Once the server is running, you can edit trades through the Trades sub-tab (under History) in the browser, which saves back to the server via `POST /api/trades`
 
 ## Importing from Charles Schwab
 

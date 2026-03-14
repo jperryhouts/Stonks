@@ -231,6 +231,12 @@ main { line-height: 1.5; }
 
 /* History table */
 
+.history-balances {
+    overflow-x: auto;
+    overflow-y: clip; /* avoid implicit overflow-y:auto which would break sticky thead */
+    -webkit-overflow-scrolling: touch;
+}
+
 #history-table {
     width: 100%;
     border-collapse: collapse;
@@ -263,6 +269,15 @@ main { line-height: 1.5; }
 
 #history-table tbody tr:hover td:first-child {
     background: #f0f0f0;
+}
+
+/* Editable retirement account columns */
+#history-table th.history-editable {
+    color: #6366f1;
+    border-bottom: 2px solid rgba(99, 102, 241, 0.4);
+}
+#history-table td.history-editable {
+    box-shadow: inset 1px 0 0 rgba(99, 102, 241, 0.2), inset -1px 0 0 rgba(99, 102, 241, 0.2);
 }
 
 #history-table tfoot td {

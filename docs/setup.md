@@ -34,9 +34,9 @@ DATA_DIR=./data node app/serve.js
 
 Open http://localhost:8000.
 
-> **What you get at this point:** A fully functional app with the demo portfolio — all six tabs work. Explore the interface before touching any data file. The next steps replace the demo content with your real holdings.
+> **What you get at this point:** A fully functional app with the demo portfolio — all five tabs work. Explore the interface before touching any data file. The next steps replace the demo content with your real holdings.
 
-> **Minimum setup:** Steps 1 and 2 are all you need to see your real portfolio. The Overview, History, Gains, and Trades tabs work with just `trades.json` and `market.csv`. Steps 3–5 add the Analysis tab exposure breakdown, rebalancing calculator, retirement accounts, and formula-driven assets.
+> **Minimum setup:** Steps 1 and 2 are all you need to see your real portfolio. The Overview, History, and Gains tabs work with just `trades.json` and `market.csv`. Steps 3–5 add the Analysis tab exposure breakdown, rebalancing calculator, retirement accounts, and formula-driven assets.
 
 ---
 
@@ -54,11 +54,11 @@ Edit `data/trades.json` with your actual transaction history. Each trade has a d
 
 All values are strings. See [Transaction Log](trades.md) for the full format reference, including sell, DRIP, and donation types.
 
-> **Tip:** The Trades tab in the browser lets you add, edit, and delete trades without touching the JSON. For an initial import of a long history, editing the file directly is usually faster — but once you're set up, the UI is convenient for adding new trades one at a time.
+> **Tip:** The Trades sub-tab (under History) lets you add, edit, and delete trades without touching the JSON. For an initial import of a long history, editing the file directly is usually faster — but once you're set up, the UI is convenient for adding new trades one at a time.
 
 > **Importing from Charles Schwab?** See the [Schwab importer](#importing-from-charles-schwab) section at the bottom of this guide.
 
-> **What you get at this point:** The Trades tab shows your full transaction history, and the Gains tab shows realized gains. The Overview chart still shows demo prices — the next step fetches market data for your tickers.
+> **What you get at this point:** The History tab's Trades sub-tab shows your full transaction history, and the Gains tab shows realized gains. The Overview chart still shows demo prices — the next step fetches market data for your tickers.
 
 ---
 
@@ -89,7 +89,7 @@ The script reads tickers from `trades.json`, fetches prices, and runs a backfill
 
 ## Step 3: Configure exposure categories
 
-The Overview, History, Gains, and Trades tabs all work without any configuration. But to enable the Analysis tab breakdown and the rebalancing calculator, you need a `config.json` that maps your symbols to categories.
+The Overview, History, and Gains tabs all work without any configuration. But to enable the Analysis tab breakdown and the rebalancing calculator, you need a `config.json` that maps your symbols to categories.
 
 The easiest approach: edit `data/config.json` (copied from the demo) to match your holdings — delete entries you don't need and adjust categories as needed.
 
@@ -255,7 +255,7 @@ See [Deterministic Assets](assets.md) for mortgage and I-bond configuration deta
 
 **Daily prices:** Handled automatically by the Docker fetcher during market hours. For local installs, run the command from [step 2](#step-2-update-market-data-for-your-tickers) at least once a day.
 
-**New trades:** Add them to `trades.json` by hand, or use the Trades tab in the browser (which saves back to the server when you click the "Save" button in the UI).
+**New trades:** Add them to `trades.json` by hand, or use the Trades sub-tab under History in the browser (which saves back to the server when you click the "Save" button in the UI).
 
 **Retirement values:** Double click any retirement account cell in the History tab to update its ground-truth value, or edit `retirement.json` directly.
 

@@ -513,9 +513,12 @@ function _histGetEditDialog() {
     }
   });
 
-  // Dismiss on Escape
+  // Dismiss on Escape; save on Enter
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") _histEditHide();
+  });
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); _histEditSave(); }
   });
 
   _histEditDlg = dlg;
@@ -623,6 +626,7 @@ function _histEditPost(state) {
 }
 
 function _histAttachEditHandler(td, date, sym, retirement, rebuildAll, currentVal) {
+  td.classList.add("history-editable");
   td.style.cursor = "pointer";
 
   // Desktop: double-click
@@ -647,8 +651,31 @@ function _histAttachEditHandler(td, date, sym, retirement, rebuildAll, currentVa
   });
 }
 
-function buildHistoryTable(data, retirement, rebuildAll) {
+function buildHistoryTable(data, retirement, rebuildAll, trades, marketTickers) {
   var container = document.getElementById("panel-table");
+
+  // Sub-tab bar
+  var subtabBar = document.createElement("div");
+  subtabBar.className = "tools-subtabs";
+  var balancesBtn = document.createElement("button");
+  balancesBtn.className = "tools-subtab active";
+  balancesBtn.textContent = "Balances";
+  var tradesBtn = document.createElement("button");
+  tradesBtn.className = "tools-subtab";
+  tradesBtn.textContent = "Trades";
+  subtabBar.appendChild(balancesBtn);
+  subtabBar.appendChild(tradesBtn);
+  container.appendChild(subtabBar);
+
+  // Sub-panels
+  var balancesPanel = document.createElement("div");
+  balancesPanel.className = "history-balances";
+  container.appendChild(balancesPanel);
+  var tradesSubPanel = document.createElement("div");
+  tradesSubPanel.id = "panel-trades";
+  tradesSubPanel.className = "hidden";
+  container.appendChild(tradesSubPanel);
+
   var cd = data.chartData;
   var symbols = data.symbols;
 
@@ -694,6 +721,7 @@ function buildHistoryTable(data, retirement, rebuildAll) {
   for (var i = 0; i < activeSymbols.length; i++) {
     var th = document.createElement("th");
     th.textContent = activeSymbols[i];
+    if (retirementSet[activeSymbols[i]]) th.classList.add("history-editable");
     headerRow.appendChild(th);
   }
 
@@ -719,6 +747,7 @@ function buildHistoryTable(data, retirement, rebuildAll) {
       var thZ = document.createElement("th");
       thZ.textContent = zeroSymbols[i2];
       thZ.className = "zero-col";
+      if (retirementSet[zeroSymbols[i2]]) thZ.classList.add("history-editable");
       headerRow.appendChild(thZ);
     }
   }
@@ -808,7 +837,24 @@ function buildHistoryTable(data, retirement, rebuildAll) {
   }
   table.appendChild(tbody);
 
-  container.appendChild(table);
+  balancesPanel.appendChild(table);
+
+  // Sub-tab switching
+  balancesBtn.addEventListener("click", function () {
+    balancesBtn.classList.add("active");
+    tradesBtn.classList.remove("active");
+    balancesPanel.classList.remove("hidden");
+    tradesSubPanel.classList.add("hidden");
+  });
+  tradesBtn.addEventListener("click", function () {
+    tradesBtn.classList.add("active");
+    balancesBtn.classList.remove("active");
+    tradesSubPanel.classList.remove("hidden");
+    balancesPanel.classList.add("hidden");
+  });
+
+  // Populate trades sub-tab
+  buildTradesPanel(trades, marketTickers, rebuildAll);
 }
 
 // Apply a red→white→green background and a delta tooltip to a history cell.
@@ -2238,7 +2284,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   // Tab switching
   var tabs = document.querySelectorAll("#tabs .tab");
-  var panelNames = ["chart", "exposure", "table", "gains", "trades", "tools"];
+  var panelNames = ["chart", "exposure", "table", "gains", "tools"];
   for (var ti = 0; ti < tabs.length; ti++) {
     tabs[ti].addEventListener("click", function () {
       var target = this.getAttribute("data-tab");
@@ -2284,13 +2330,12 @@ document.addEventListener("DOMContentLoaded", async function () {
         updateTitle();
         updateDetail(state.data, state.data.chartData.length - 1);
         document.getElementById("panel-table").innerHTML = "";
-        buildHistoryTable(fullData, retirement, rebuildAll);
-        document.getElementById("panel-exposure").innerHTML = "";
-        buildExposurePanel(fullData, trades, retirement, assets);
         var tickers = market.length > 0
           ? Object.keys(market[0]).filter(function (k) { return k !== "timestamp"; })
           : [];
-        buildTradesPanel(trades, tickers, rebuildAll);
+        buildHistoryTable(fullData, retirement, rebuildAll, trades, tickers);
+        document.getElementById("panel-exposure").innerHTML = "";
+        buildExposurePanel(fullData, trades, retirement, assets);
         buildGainsPanel(gainsData);
         buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG);
         showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
@@ -2318,9 +2363,8 @@ document.addEventListener("DOMContentLoaded", async function () {
   drawChart(chartRef, state.data, null);
   updateTitle();
   updateDetail(state.data, state.data.chartData.length - 1);
-  buildHistoryTable(fullData, retirement, rebuildAll);
+  buildHistoryTable(fullData, retirement, rebuildAll, trades, marketTickers);
   buildExposurePanel(fullData, trades, retirement, assets);
-  buildTradesPanel(trades, marketTickers, rebuildAll);
   buildGainsPanel(gainsData);
   buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG);
   showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));

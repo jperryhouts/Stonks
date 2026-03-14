@@ -13,7 +13,7 @@ A personal portfolio tracker built on plain text files, zero dependencies, and f
 
 ## Features
 
-Tracks stocks, ETFs, and individual equities via daily market prices, retirement accounts (401k, HSA, 403b) via proxy-based interpolation, and formula-driven assets like mortgage equity and I-bonds. Six tabs covering different aspects of portfolio tracking:
+Tracks stocks, ETFs, and individual equities via daily market prices, retirement accounts (401k, HSA, 403b) via proxy-based interpolation, and formula-driven assets like mortgage equity and I-bonds. Five tabs covering different aspects of portfolio tracking:
 
 **Overview** -- Stacked area chart with time window filtering and hover detail panel.
 
@@ -21,17 +21,15 @@ Tracks stocks, ETFs, and individual equities via daily market prices, retirement
 
 ![Analysis — exposure breakdown with NVDA subcategory](docs/screenshots/analysis.png)
 
-**History** -- Daily portfolio values table with inline editing for retirement account ground-truth values.
+**History** -- Daily portfolio values table (Balances sub-tab) and editable transaction log (Trades sub-tab). Balances supports inline editing for retirement account ground-truth values; Trades saves back to the server.
 
 ![History — daily values per symbol](docs/screenshots/history.png)
+
+![Trades — transaction log with buys, sells, DRIPs, and donations](docs/screenshots/trades.png)
 
 **Gains** -- Capital gains report (FIFO or average cost). Realized & Donations sub-tab has a time window filter (default YTD) that updates the ST/LT summary and both tables. Unrealized sub-tab shows a ST/LT summary and per-symbol rows with expandable lot-level detail.
 
 ![Gains — realized, unrealized, and donation tracking](docs/screenshots/gains.png)
-
-**Trades** -- Editable transaction log with save-to-server.
-
-![Trades — transaction log with buys, sells, DRIPs, and donations](docs/screenshots/trades.png)
 
 **Tools** -- Rebalancing calculator and contribution worksheet.
 
