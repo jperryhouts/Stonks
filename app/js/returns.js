@@ -22,7 +22,7 @@
     if (slice.length < 2) return { twr: null, xirr: null, twrCumulative: null, xirrCumulative: null };
 
     var days = Math.round(
-      (new Date(slice[slice.length - 1].date) - new Date(slice[0].date)) / 86400000
+      (new Date(slice[slice.length - 1].date + "T00:00:00") - new Date(slice[0].date + "T00:00:00")) / 86400000
     );
     if (days < 1) return { twr: null, xirr: null, twrCumulative: null, xirrCumulative: null };
 
@@ -90,7 +90,7 @@
     var endVal = slice[slice.length - 1].total;
 
     if (startVal > 0 || endVal > 0) {
-      var t0 = new Date(slice[0].date).getTime();
+      var t0 = new Date(slice[0].date + "T00:00:00").getTime();
       var cfs = [];
 
       if (startVal > 0) {
@@ -113,10 +113,10 @@
         // buy (qty2 > 0): investor pays out → negative CF
         // sell (qty2 < 0): investor receives → positive CF
         var tradeAmt = qty2 > 0 ? -(qty2 * price2) : Math.abs(qty2) * price2;
-        cfs.push({ amount: tradeAmt, t: new Date(tx2.date).getTime() });
+        cfs.push({ amount: tradeAmt, t: new Date(tx2.date + "T00:00:00").getTime() });
       }
 
-      cfs.push({ amount: endVal, t: new Date(slice[slice.length - 1].date).getTime() });
+      cfs.push({ amount: endVal, t: new Date(slice[slice.length - 1].date + "T00:00:00").getTime() });
 
       xirr = _xirr(cfs);
       if (xirr !== null) xirrCum = Math.pow(1 + xirr, days / 365) - 1;

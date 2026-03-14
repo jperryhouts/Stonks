@@ -69,7 +69,7 @@
             if (lot.date !== tx.lotDate || lot.quantity < 1e-9) continue;
             foundAny = true;
             var consumed = Math.min(lot.quantity, remaining);
-            var holdDays = Math.round((new Date(tx.date) - new Date(lot.date)) / 86400000);
+            var holdDays = Math.round((new Date(tx.date + "T00:00:00") - new Date(lot.date + "T00:00:00")) / 86400000);
             var lotCost = consumed * lot.price;
             if (isDonation) {
               donated.push({
@@ -121,7 +121,7 @@
             var lot = lots[sym][0];
             var consumed = Math.min(lot.quantity, remaining);
             var holdDays = Math.round(
-              (new Date(tx.date) - new Date(lot.date)) / 86400000
+              (new Date(tx.date + "T00:00:00") - new Date(lot.date + "T00:00:00")) / 86400000
             );
             var costBasis = consumed * lot.price;
             if (isDonation) {
@@ -194,7 +194,7 @@
 
         if (currentDate) {
           var holdDays = Math.round(
-            (new Date(currentDate) - new Date(lot.date)) / 86400000
+            (new Date(currentDate + "T00:00:00") - new Date(lot.date + "T00:00:00")) / 86400000
           );
           var lotGain = lot.quantity * (currentPrice - lot.price);
           var isLotLT = holdDays > 365;
