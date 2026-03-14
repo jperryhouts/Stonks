@@ -30,6 +30,7 @@
       symbolOrder: null,
       rebalancingConfig: null,
       marginLoanDisplay: null,
+      capitalGainsMethod: null,
     };
 
     if (!cfg) return result;
@@ -113,13 +114,12 @@
       }
     }
 
-    if (cfg.marginLoan && cfg.marginLoan.chartDisplay) {
-      var mode = cfg.marginLoan.chartDisplay;
-      if (mode === "proportional") {
-        result.marginLoanDisplay = mode;
-      } else {
-        result.marginLoanDisplay = "proportional";
-      }
+    if (cfg.marginLoan && cfg.marginLoan.chartDisplay === "proportional") {
+      result.marginLoanDisplay = "proportional";
+    }
+
+    if (cfg.capitalGains && cfg.capitalGains.method === "FIFO") {
+      result.capitalGainsMethod = "FIFO";
     }
 
     return result;

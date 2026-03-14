@@ -50,6 +50,43 @@ main { line-height: 1.5; }
 
 .panel.hidden { display: none; }
 
+/* Notification banner */
+
+.banner {
+    background: #fef9c3;
+    border: 1px solid #fde047;
+    border-radius: 6px;
+    padding: 0.5rem 2.5rem 0.5rem 1rem;
+    margin-bottom: 1rem;
+    position: relative;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.banner.banner-error {
+    background: #fee2e2;
+    border-color: #fca5a5;
+}
+
+.banner ul { list-style: none; }
+.banner li + li { margin-top: 0.2rem; }
+
+.banner-dismiss {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.6rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.25rem;
+    color: #666;
+    line-height: 1;
+    padding: 0;
+    font-family: inherit;
+}
+
+.banner-dismiss:hover { color: #1a1a1a; }
+
 /* Chart */
 
 #chart-wrap {

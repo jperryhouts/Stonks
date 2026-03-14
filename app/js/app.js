@@ -2160,6 +2160,29 @@ function buildTradesPanel(trades, marketTickers, onSave) {
 
 
 // ---------------------------------------------------------------------------
+// Notification banner
+// ---------------------------------------------------------------------------
+
+function showBanner(items) {
+  var banner = document.getElementById("banner");
+  var list = document.getElementById("banner-list");
+  list.innerHTML = "";
+  if (!items || items.length === 0) {
+    banner.classList.add("hidden");
+    return;
+  }
+  var hasError = false;
+  for (var bi = 0; bi < items.length; bi++) {
+    var li = document.createElement("li");
+    li.textContent = "\u26a0 " + items[bi].text;
+    list.appendChild(li);
+    if (items[bi].level === "error") hasError = true;
+  }
+  banner.classList.toggle("banner-error", hasError);
+  banner.classList.remove("hidden");
+}
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 
@@ -2270,6 +2293,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         buildTradesPanel(trades, tickers, rebuildAll);
         buildGainsPanel(gainsData);
         buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG);
+        showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
       });
   }
 
@@ -2299,8 +2323,13 @@ document.addEventListener("DOMContentLoaded", async function () {
   buildTradesPanel(trades, marketTickers, rebuildAll);
   buildGainsPanel(gainsData);
   buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG);
+  showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
   attachListeners(canvas, state, chartRef);
   document.body.classList.remove("loading");
+
+  document.getElementById("banner-dismiss").addEventListener("click", function () {
+    document.getElementById("banner").classList.add("hidden");
+  });
 
   document.getElementById("detail-expand").addEventListener("click", function () {
     document.getElementById("detail").classList.toggle("detail-expanded");

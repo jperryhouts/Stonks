@@ -97,9 +97,26 @@ describe("parseConfig - old format: other fields", () => {
     assert.deepStrictEqual(result.colors, colors);
   });
 
-  it("parses marginLoan.chartDisplay", () => {
+  it("parses marginLoan.chartDisplay: 'proportional'", () => {
     var result = parseConfig({ marginLoan: { chartDisplay: "proportional" } });
     assert.equal(result.marginLoanDisplay, "proportional");
+  });
+
+  it("ignores marginLoan.chartDisplay when value is not 'proportional'", () => {
+    assert.equal(parseConfig({ marginLoan: { chartDisplay: "unknown" } }).marginLoanDisplay, null);
+    assert.equal(parseConfig({ marginLoan: { chartDisplay: "" } }).marginLoanDisplay, null);
+    assert.equal(parseConfig({ marginLoan: { chartDisplay: 123 } }).marginLoanDisplay, null);
+  });
+
+  it("parses capitalGains.method: 'FIFO'", () => {
+    var result = parseConfig({ capitalGains: { method: "FIFO" } });
+    assert.equal(result.capitalGainsMethod, "FIFO");
+  });
+
+  it("ignores capitalGains.method when value is not 'FIFO'", () => {
+    assert.equal(parseConfig({ capitalGains: { method: "LIFO" } }).capitalGainsMethod, null);
+    assert.equal(parseConfig({ capitalGains: { method: "" } }).capitalGainsMethod, null);
+    assert.equal(parseConfig({ capitalGains: { method: "fifo" } }).capitalGainsMethod, null);
   });
 
   it("returns all nulls for empty config", () => {
@@ -110,6 +127,7 @@ describe("parseConfig - old format: other fields", () => {
     assert.equal(result.symbolOrder, null);
     assert.equal(result.rebalancingConfig, null);
     assert.equal(result.marginLoanDisplay, null);
+    assert.equal(result.capitalGainsMethod, null);
   });
 
   it("returns all nulls for null config", () => {
