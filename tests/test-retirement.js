@@ -215,3 +215,71 @@ describe("mergeRetirement — interpolation", () => {
     assert.deepEqual(data.chartData[0].cumulative, [5000, 15000]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// mergeRetirement — multi-account contributions
+// ---------------------------------------------------------------------------
+
+describe("mergeRetirement — multi-account contributions", () => {
+  it("each account reflects only its own contributions with flat proxy", () => {
+    const chartData = [
+      { date: "2024-01-02", prices: { VTI: "100" }, values: {}, cumulative: [], total: 0 },
+      { date: "2024-01-03", prices: { VTI: "100" }, values: {}, cumulative: [], total: 0 },
+    ];
+    const data = makeData([], chartData);
+    const retirement = {
+      accounts: [{ name: "401k", proxy: "VTI" }, { name: "Roth IRA", proxy: "VTI" }],
+      values: [],
+      contributions: [
+        { date: "2024-01-02", account: "401k",     amount: "10000" },
+        { date: "2024-01-02", account: "Roth IRA", amount: "5000" },
+      ],
+    };
+    mergeRetirement(data, retirement, MARKET);
+    // Day 1: each account starts at its own contribution amount
+    assert.equal(data.chartData[0].values["401k"], 10000);
+    assert.equal(data.chartData[0].values["Roth IRA"], 5000);
+    // Day 2: proxy is flat so values stay the same
+    assert.equal(data.chartData[1].values["401k"], 10000);
+    assert.equal(data.chartData[1].values["Roth IRA"], 5000);
+  });
+
+  it("contribution for one account does not affect the other account's value", () => {
+    const chartData = [
+      { date: "2024-01-02", prices: { VTI: "100" }, values: {}, cumulative: [], total: 0 },
+      { date: "2024-01-03", prices: { VTI: "100" }, values: {}, cumulative: [], total: 0 },
+    ];
+    const data = makeData([], chartData);
+    const retirement = {
+      accounts: [{ name: "401k", proxy: "VTI" }, { name: "Roth IRA", proxy: "VTI" }],
+      values: [],
+      contributions: [
+        { date: "2024-01-02", account: "401k",     amount: "10000" },
+        { date: "2024-01-02", account: "Roth IRA", amount: "5000" },
+      ],
+    };
+    mergeRetirement(data, retirement, MARKET);
+    // 401k should never have Roth IRA's amount and vice versa
+    assert.notEqual(data.chartData[0].values["401k"], 5000);
+    assert.notEqual(data.chartData[0].values["Roth IRA"], 10000);
+    assert.notEqual(data.chartData[1].values["401k"], 5000);
+    assert.notEqual(data.chartData[1].values["Roth IRA"], 10000);
+  });
+
+  it("contribution-based account and ground-truth-only account don't cross-contaminate", () => {
+    const chartData = [
+      { date: "2024-01-02", prices: { VTI: "100" }, values: {}, cumulative: [], total: 0 },
+      { date: "2024-01-03", prices: { VTI: "100" }, values: {}, cumulative: [], total: 0 },
+    ];
+    const data = makeData([], chartData);
+    const retirement = {
+      accounts: [{ name: "401k", proxy: "VTI" }, { name: "HSA", proxy: "VTI" }],
+      values:        [{ date: "2024-01-02", account: "HSA",  value: "3000" }],
+      contributions: [{ date: "2024-01-02", account: "401k", amount: "8000" }],
+    };
+    mergeRetirement(data, retirement, MARKET);
+    // 401k should reflect its contribution, HSA its ground truth
+    assert.equal(data.chartData[0].values["401k"], 8000);
+    assert.equal(data.chartData[0].values["HSA"], 3000);
+  });
+});

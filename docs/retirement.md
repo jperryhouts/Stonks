@@ -104,13 +104,17 @@ Once interpolated, retirement account values are treated like any other symbol:
 - **Overview tab**: included in the stacked area chart. Order controlled by `symbolOrder` in `config.json` (retirement accounts are typically placed at the bottom of the stack).
 - **Allocation tab**: included in exposure calculations via fractional allocations (see [Exposure Tracking](exposure.md)). A 401k in a target-date fund can be split across Domestic, International, and Bond categories.
 - **Performance tab (Realized sub-tab)**: TWR and XIRR return metrics are computed here — contributions are the cash flows (see [Return metrics](#return-metrics)).
-- **History tab**: shows the interpolated daily value. Ground-truth cells are editable — double-click to update the value (long-press on mobile), which writes back to `retirement.json` via the server.
+- **History tab**: three sub-tabs:
+  - **Balances**: shows the interpolated daily value. Ground-truth cells are editable — double-click to update (long-press on mobile).
+  - **Retirement Contributions**: browser editor for the contributions array. Select an account from the dropdown to view and edit its entries; add, delete, and save rows without touching the JSON file.
+  - **Trades**: not applicable to retirement accounts.
 - **Performance tab**: shows capital gains (realized/unrealized) for brokerage symbols. Retirement accounts don't have individual trade lots, so they don't appear here.
 
 ## Adding a new retirement account
 
-> **Browser editor:** You can complete steps 1–2 using **Settings →
-> Retirement** in the browser instead of editing the file directly.
+> **Browser editor:** Step 1 (account definition) can be done in **Settings → Retirement**.
+> Step 2 (contribution history) can be done in **History → Retirement Contributions** — select the account
+> from the dropdown and add rows there.
 
 1. Add the account definition to `retirement.json`:
    ```json

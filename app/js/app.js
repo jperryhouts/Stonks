@@ -665,8 +665,12 @@ function buildHistoryTable(data, retirement, rebuildAll, trades, marketTickers) 
   var tradesBtn = document.createElement("button");
   tradesBtn.className = "tools-subtab";
   tradesBtn.textContent = "Trades";
+  var contribBtn = document.createElement("button");
+  contribBtn.className = "tools-subtab";
+  contribBtn.textContent = "Retirement Contributions";
   subtabBar.appendChild(balancesBtn);
   subtabBar.appendChild(tradesBtn);
+  subtabBar.appendChild(contribBtn);
   container.appendChild(subtabBar);
 
   // Sub-panels
@@ -677,6 +681,10 @@ function buildHistoryTable(data, retirement, rebuildAll, trades, marketTickers) 
   tradesSubPanel.id = "panel-trades";
   tradesSubPanel.className = "hidden";
   container.appendChild(tradesSubPanel);
+  var contribSubPanel = document.createElement("div");
+  contribSubPanel.id = "panel-contributions";
+  contribSubPanel.className = "hidden";
+  container.appendChild(contribSubPanel);
 
   var cd = data.chartData;
   var symbols = data.symbols;
@@ -845,18 +853,31 @@ function buildHistoryTable(data, retirement, rebuildAll, trades, marketTickers) 
   balancesBtn.addEventListener("click", function () {
     balancesBtn.classList.add("active");
     tradesBtn.classList.remove("active");
+    contribBtn.classList.remove("active");
     balancesPanel.classList.remove("hidden");
     tradesSubPanel.classList.add("hidden");
+    contribSubPanel.classList.add("hidden");
   });
   tradesBtn.addEventListener("click", function () {
     tradesBtn.classList.add("active");
     balancesBtn.classList.remove("active");
+    contribBtn.classList.remove("active");
     tradesSubPanel.classList.remove("hidden");
     balancesPanel.classList.add("hidden");
+    contribSubPanel.classList.add("hidden");
+  });
+  contribBtn.addEventListener("click", function () {
+    contribBtn.classList.add("active");
+    balancesBtn.classList.remove("active");
+    tradesBtn.classList.remove("active");
+    contribSubPanel.classList.remove("hidden");
+    balancesPanel.classList.add("hidden");
+    tradesSubPanel.classList.add("hidden");
   });
 
-  // Populate trades sub-tab
+  // Populate trades and contributions sub-tabs
   buildTradesPanel(trades, marketTickers, rebuildAll);
+  buildContributionsPanel(retirement, rebuildAll);
 }
 
 // Apply a red→white→green background and a delta tooltip to a history cell.
@@ -1666,6 +1687,322 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
 }
 
 // ---------------------------------------------------------------------------
+// Contributions editor
+// ---------------------------------------------------------------------------
+
+function buildContributionsPanel(retirement, onSave) {
+  var container = document.getElementById("panel-contributions");
+  container.innerHTML = "";
+
+  var accounts = (retirement && retirement.accounts) ? retirement.accounts.slice() : [];
+  accounts.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  var allContribs = (retirement && retirement.contributions) ? retirement.contributions : [];
+
+  if (accounts.length === 0) {
+    var emptyMsg = document.createElement("p");
+    emptyMsg.style.padding = "1rem";
+    emptyMsg.textContent = "No retirement accounts found. Add accounts in Settings → Retirement.";
+    container.appendChild(emptyMsg);
+    return;
+  }
+
+  // Controls bar: account selector + action buttons in one row
+  var controls = document.createElement("div");
+  controls.className = "trades-controls";
+
+  var accountSelect = document.createElement("select");
+  accountSelect.className = "trades-input";
+  accountSelect.style.width = "auto";
+  for (var ai = 0; ai < accounts.length; ai++) {
+    var acctOpt = document.createElement("option");
+    acctOpt.value = accounts[ai].name;
+    acctOpt.textContent = accounts[ai].name;
+    accountSelect.appendChild(acctOpt);
+  }
+  controls.appendChild(accountSelect);
+
+  var addBtn = document.createElement("button");
+  addBtn.className = "trades-btn";
+  addBtn.textContent = "Add Row";
+  controls.appendChild(addBtn);
+
+  var saveBtn = document.createElement("button");
+  saveBtn.className = "trades-btn trades-btn-primary";
+  saveBtn.textContent = "Save";
+  saveBtn.style.display = "none";
+  controls.appendChild(saveBtn);
+
+  var status = document.createElement("span");
+  status.className = "trades-status";
+  controls.appendChild(status);
+
+  container.appendChild(controls);
+
+  // Row list
+  var list = document.createElement("div");
+  list.id = "contributions-list";
+  container.appendChild(list);
+
+  var currentExpanded = null;
+
+  function updateSaveBtn() {
+    var dirty = list.querySelectorAll(".trade-row.trade-dirty");
+    var invalid = list.querySelectorAll(".trade-row.trade-dirty.trade-invalid");
+    saveBtn.style.display = dirty.length > 0 ? "" : "none";
+    saveBtn.disabled = invalid.length > 0;
+  }
+
+  function validateContribRow(rowDiv) {
+    var bad = [];
+    var dateInput = rowDiv.querySelector('[name="date"]');
+    var amountInput = rowDiv.querySelector('[name="amount"]');
+    var dateVal = dateInput ? dateInput.value : "";
+    var amountVal = amountInput ? amountInput.value : "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateVal) || isNaN(Date.parse(dateVal))) bad.push("date");
+    var amt = parseFloat(amountVal);
+    if (isNaN(amt) || amt <= 0) bad.push("amount");
+    return bad;
+  }
+
+  function readContribValues(rowDiv) {
+    return {
+      date: (rowDiv.querySelector('[name="date"]') || {}).value || "",
+      amount: (rowDiv.querySelector('[name="amount"]') || {}).value || "",
+    };
+  }
+
+  function formatContribSummary(vals) {
+    var date = vals.date || "—";
+    var amt = parseFloat(vals.amount);
+    var amtStr = isNaN(amt) ? "—" : "$" + amt.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return date + "  \u00b7  " + amtStr;
+  }
+
+  function collapseRow(rowDiv) {
+    if (!rowDiv) return;
+    rowDiv.querySelector(".trade-detail").hidden = true;
+    rowDiv.classList.remove("trade-expanded");
+    if (currentExpanded === rowDiv) currentExpanded = null;
+  }
+
+  function expandRow(rowDiv) {
+    if (currentExpanded && currentExpanded !== rowDiv) collapseRow(currentExpanded);
+    rowDiv.querySelector(".trade-detail").hidden = false;
+    rowDiv.classList.add("trade-expanded");
+    currentExpanded = rowDiv;
+    var dateInput = rowDiv.querySelector('[name="date"]');
+    if (dateInput) dateInput.focus();
+  }
+
+  function makeContribRow(entry, isNew) {
+    var rowDiv = document.createElement("div");
+    rowDiv.className = "trade-row";
+
+    // Summary
+    var summaryDiv = document.createElement("div");
+    summaryDiv.className = "trade-summary";
+    var summarySpan = document.createElement("span");
+    summarySpan.className = "trade-summary-text";
+    summarySpan.textContent = formatContribSummary({ date: entry.date || "", amount: entry.amount || "" });
+    var invalidIndicator = document.createElement("span");
+    invalidIndicator.className = "trade-invalid-indicator";
+    invalidIndicator.title = "This row has missing or invalid fields";
+    invalidIndicator.textContent = "\u26a0";
+    summaryDiv.appendChild(summarySpan);
+    summaryDiv.appendChild(invalidIndicator);
+    summaryDiv.addEventListener("click", function () {
+      if (currentExpanded === rowDiv) collapseRow(rowDiv);
+      else expandRow(rowDiv);
+    });
+    rowDiv.appendChild(summaryDiv);
+
+    // Detail
+    var detailDiv = document.createElement("div");
+    detailDiv.className = "trade-detail";
+    detailDiv.hidden = true;
+
+    var fieldsGrid = document.createElement("div");
+    fieldsGrid.className = "trade-fields-grid";
+
+    function makeField(labelText, widthClass, inputEl) {
+      var fieldDiv = document.createElement("div");
+      fieldDiv.className = "trade-field " + widthClass;
+      var lbl = document.createElement("label");
+      lbl.textContent = labelText;
+      fieldDiv.appendChild(lbl);
+      fieldDiv.appendChild(inputEl);
+      return fieldDiv;
+    }
+
+    // Account (read-only label)
+    var acctDisplay = document.createElement("div");
+    acctDisplay.className = "trades-input";
+    acctDisplay.style.background = "transparent";
+    acctDisplay.style.border = "none";
+    acctDisplay.style.padding = "0";
+    acctDisplay.style.lineHeight = "1.8";
+    acctDisplay.textContent = accountSelect.value;
+    fieldsGrid.appendChild(makeField("Account", "trade-field-symbol", acctDisplay));
+
+    // Date
+    var inputDate = document.createElement("input");
+    inputDate.type = "text";
+    inputDate.className = "trades-input";
+    inputDate.name = "date";
+    inputDate.value = entry.date || "";
+    inputDate.placeholder = "YYYY-MM-DD";
+    fieldsGrid.appendChild(makeField("Date", "trade-field-date", inputDate));
+
+    // Amount
+    var inputAmount = document.createElement("input");
+    inputAmount.type = "number";
+    inputAmount.className = "trades-input";
+    inputAmount.name = "amount";
+    inputAmount.value = entry.amount || "";
+    inputAmount.placeholder = "0.00";
+    inputAmount.min = "0";
+    inputAmount.step = "any";
+    fieldsGrid.appendChild(makeField("Amount", "trade-field-price", inputAmount));
+
+    detailDiv.appendChild(fieldsGrid);
+
+    var originalVals;
+
+    function updateState() {
+      var current = readContribValues(rowDiv);
+      var dirty = originalVals === null || !(
+        current.date === originalVals.date && current.amount === originalVals.amount
+      );
+      rowDiv.classList.toggle("trade-dirty", dirty);
+
+      var badFields = dirty ? validateContribRow(rowDiv) : [];
+      rowDiv.classList.toggle("trade-invalid", badFields.length > 0);
+      detailDiv.querySelectorAll(".trades-input").forEach(function (el) {
+        el.classList.toggle("trades-input-invalid", badFields.indexOf(el.name) >= 0);
+      });
+
+      summarySpan.textContent = formatContribSummary(current);
+      updateSaveBtn();
+    }
+
+    rowDiv._update = updateState;
+    detailDiv.addEventListener("input", updateState);
+
+    // Footer with delete
+    var footer = document.createElement("div");
+    footer.className = "trade-detail-footer";
+
+    var delBtn = document.createElement("button");
+    delBtn.className = "trades-btn trades-btn-danger trades-btn-del";
+    delBtn.textContent = "\u{1F5D1}";
+    delBtn.title = "Delete row";
+    delBtn.addEventListener("click", function () {
+      if (delBtn.dataset.confirm === "1") {
+        if (currentExpanded === rowDiv) currentExpanded = null;
+        rowDiv.remove();
+        updateSaveBtn();
+      } else {
+        delBtn.dataset.confirm = "1";
+        delBtn.title = "Click again to confirm deletion";
+        delBtn.classList.add("trades-btn-del-confirm");
+        setTimeout(function () {
+          delBtn.dataset.confirm = "";
+          delBtn.title = "Delete row";
+          delBtn.classList.remove("trades-btn-del-confirm");
+        }, 2500);
+      }
+    });
+    footer.appendChild(delBtn);
+    detailDiv.appendChild(footer);
+
+    rowDiv.appendChild(detailDiv);
+    originalVals = isNew ? null : readContribValues(rowDiv);
+    return rowDiv;
+  }
+
+  function renderRows() {
+    list.innerHTML = "";
+    currentExpanded = null;
+    var selectedAccount = accountSelect.value;
+    var filtered = allContribs.filter(function (c) { return c.account === selectedAccount; });
+    filtered.sort(function (a, b) { return a.date > b.date ? -1 : a.date < b.date ? 1 : 0; });
+    for (var i = 0; i < filtered.length; i++) {
+      list.appendChild(makeContribRow(filtered[i], false));
+    }
+    updateSaveBtn();
+  }
+
+  renderRows();
+
+  accountSelect.addEventListener("change", function () {
+    renderRows();
+    status.textContent = "";
+  });
+
+  addBtn.addEventListener("click", function () {
+    var today = localDateString();
+    var newRow = makeContribRow({ date: today, amount: "" }, true);
+    list.insertBefore(newRow, list.firstChild);
+    newRow._update();
+    expandRow(newRow);
+  });
+
+  saveBtn.addEventListener("click", function () {
+    if (currentExpanded) collapseRow(currentExpanded);
+    var selectedAccount = accountSelect.value;
+    var rowDivs = list.querySelectorAll(".trade-row");
+    var updatedContribs = [];
+    for (var r = 0; r < rowDivs.length; r++) {
+      var vals = readContribValues(rowDivs[r]);
+      updatedContribs.push({
+        date: vals.date.trim(),
+        account: selectedAccount,
+        amount: vals.amount.trim(),
+      });
+    }
+    // Merge with contributions for other accounts
+    var otherContribs = allContribs.filter(function (c) { return c.account !== selectedAccount; });
+    var merged = otherContribs.concat(updatedContribs);
+
+    var payload = {
+      accounts: retirement ? retirement.accounts : [],
+      values: retirement ? (retirement.values || []) : [],
+      contributions: merged,
+    };
+
+    status.textContent = "Saving...";
+    status.style.color = "#666";
+    saveBtn.disabled = true;
+
+    fetch("/api/retirement", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (result) {
+        saveBtn.disabled = false;
+        if (result.error) {
+          status.textContent = result.error;
+          status.style.color = "#dc2626";
+        } else {
+          allContribs = merged;
+          status.textContent = "Saved " + updatedContribs.length + " contribution" + (updatedContribs.length === 1 ? "" : "s") + ".";
+          status.style.color = "#16a34a";
+          list.querySelectorAll(".trade-row").forEach(function (r) { r.classList.remove("trade-dirty"); });
+          updateSaveBtn();
+          if (onSave) onSave();
+        }
+      })
+      .catch(function (err) {
+        saveBtn.disabled = false;
+        status.textContent = "Error: " + err.message;
+        status.style.color = "#dc2626";
+      });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Trades editor
 // ---------------------------------------------------------------------------
 
@@ -2178,6 +2515,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         buildHistoryTable(fullData, retirement, rebuildAll, trades, tickers);
         buildGainsPanel(gainsData, fullData, trades, retirement, assets);
         buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG, EXPOSURE_DISPLAY);
+        buildSettingsPanel(document.getElementById("panel-settings"), reloadAllData);
         showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
       });
   }
