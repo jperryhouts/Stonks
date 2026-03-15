@@ -4,7 +4,7 @@ Complete field-by-field reference for all data files used by the app.
 
 - [`trades.json`](#tradesjson) — transaction log
 - [`retirement.json`](#retirementjson) — retirement account definitions, contributions, and ground-truth balances
-- [`assets.json`](#assetsjson) — deterministic assets (mortgage equity, I-bonds, margin loans)
+- [`assets.json`](#assetsjson) — deterministic assets (mortgage equity, I-bonds)
 - [`config.json`](#configjson) — display, color, exposure, and rebalancing configuration
 
 ---
@@ -133,18 +133,7 @@ Tracks Series I savings bond value using the Treasury's composite rate formula.
 
 > **Composite rate formula:** `fixedRate + 2×semiannualInflation + fixedRate×semiannualInflation`. Values accrue in $25 units with penny rounding per 6-month period, matching TreasuryDirect's calculation.
 
-### Margin loan (`type: "margin_loan"`)
-
-Tracks a margin loan balance as a liability (negative value).
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `name` | string | yes | Display name |
-| `balances` | array | yes | `{ "date": "YYYY-MM-DD", "amount": <number> }` snapshots; the most recent entry on or before today is used |
-
-> **Note:** Appears as a negative (liability) symbol in the chart. Set `marginLoan.chartDisplay: "proportional"` in `config.json` to scale chart bands to show liabilities proportionally.
-
-**Example with all three types:**
+**Example:**
 
 ```json
 [
@@ -169,14 +158,6 @@ Tracks a margin loan balance as a liability (negative value).
     "rates": [
       { "setDate": "2024-01-01", "semiannualInflation": 0.0197 },
       { "setDate": "2024-07-01", "semiannualInflation": 0.0153 }
-    ]
-  },
-  {
-    "type": "margin_loan",
-    "name": "Margin Loan",
-    "balances": [
-      { "date": "2024-06-01", "amount": 15000 },
-      { "date": "2025-01-01", "amount": 12000 }
     ]
   }
 ]
@@ -221,14 +202,6 @@ Object controlling the Performance tab's lot-matching behavior.
 | `defaultMethod` | `"FIFO"` | Lot-matching method for gains computation. Only FIFO is supported. Individual sells can override per-lot via `lotDate` in `trades.json` |
 
 > **Backwards compatibility:** The old key `method` is still accepted.
-
-### `marginLoan`
-
-Object controlling how liability symbols are rendered.
-
-| Field | Valid values | Description |
-|---|---|---|
-| `chartDisplay` | `"proportional"` | When set, chart bands are scaled to show liabilities proportionally. Omit for default behavior (no scaling) |
 
 ### `exposure`
 
@@ -285,9 +258,6 @@ Array of rows shown in the Allocation tab's category table and donut chart.
   ],
   "capitalGains": {
     "defaultMethod": "FIFO"
-  },
-  "marginLoan": {
-    "chartDisplay": "proportional"
   },
   "exposure": {
     "allocations": {

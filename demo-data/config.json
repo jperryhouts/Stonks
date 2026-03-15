@@ -7,9 +7,6 @@
   "capitalGains": {
     "defaultMethod": "FIFO"
   },
-  "marginLoan": {
-    "chartDisplay": "proportional"
-  },
   "exposure": {
     "allocations": {
       "NVDA": { "NVDA": 1.0 },
