@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, getIP, serverLog, serverWarn } = require("../app/serve.js");
+const { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, getIP, serverLog, serverWarn } = require("../app/serve.js");
 
 // ---------------------------------------------------------------------------
 // csvToJson
@@ -216,6 +216,42 @@ describe("normalizeTrades", () => {
     const [h] = normalizeTrades([{ ...base, quantity: "-5", lotDate: "2024-01-02", note: "sell" }]);
     assert.equal(h.lotDate, "2024-01-02");
     assert.equal(h.note, "sell");
+  });
+
+  it("sorts by date desc, then symbol asc, then type asc, then quantity asc, then price asc", () => {
+    // Expected order after sort:
+    // [0] 2024-01-02 VTI buy  qty=5 price=101
+    // [1] 2024-01-01 VTI buy  qty=3 price=101  ← qty asc
+    // [2] 2024-01-01 VTI buy  qty=5 price=101  ← price asc within same qty
+    // [3] 2024-01-01 VTI buy  qty=5 price=102
+    // [4] 2024-01-01 VTI drip qty=5 price=101  ← type asc (buy before drip)
+    // [5] 2024-01-01 VXUS buy qty=5 price=50   ← symbol asc
+    const rows = normalizeTrades([
+      { date: "2024-01-01", symbol: "VTI",  price: "102", quantity: "5", type: "buy" },
+      { date: "2024-01-02", symbol: "VTI",  price: "101", quantity: "5", type: "buy" },
+      { date: "2024-01-01", symbol: "VXUS", price: "50",  quantity: "5", type: "buy" },
+      { date: "2024-01-01", symbol: "VTI",  price: "101", quantity: "5", type: "buy" },
+      { date: "2024-01-01", symbol: "VTI",  price: "101", quantity: "3", type: "buy" },
+      { date: "2024-01-01", symbol: "VTI",  price: "101", quantity: "5", type: "drip" },
+    ]);
+    assert.equal(rows[0].date,     "2024-01-02");  // date desc
+    assert.equal(rows[1].quantity, "3");           // quantity asc within same symbol/type
+    assert.equal(rows[2].quantity, "5");
+    assert.equal(rows[2].price,    "101");         // price asc within same quantity
+    assert.equal(rows[3].price,    "102");
+    assert.equal(rows[4].type,     "drip");        // type asc (buy before drip)
+    assert.equal(rows[5].symbol,   "VXUS");        // symbol asc
+  });
+
+  it("breaks ties on price when date/symbol/type/quantity are identical", () => {
+    const rows = normalizeTrades([
+      { date: "2024-01-01", symbol: "VTI", price: "102", quantity: "10", type: "drip" },
+      { date: "2024-01-01", symbol: "VTI", price: "100", quantity: "10", type: "drip" },
+      { date: "2024-01-01", symbol: "VTI", price: "101", quantity: "10", type: "drip" },
+    ]);
+    assert.equal(rows[0].price, "100");
+    assert.equal(rows[1].price, "101");
+    assert.equal(rows[2].price, "102");
   });
 });
 
@@ -446,5 +482,114 @@ describe("validateRetirement", () => {
     const body = validBody();
     body.contributions.push({ date: "2024-06-01", account: "", amount: "500" });
     assert.match(validateRetirement(body), /Contribution 2.*account/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalizeRetirement
+// ---------------------------------------------------------------------------
+
+describe("normalizeRetirement", () => {
+  const makeBody = (overrides = {}) => ({
+    accounts: [{ name: "401k", proxy: "VTI" }, { name: "Roth IRA", proxy: "VTI" }],
+    values: [],
+    contributions: [],
+    ...overrides,
+  });
+
+  it("sorts accounts alphabetically by name", () => {
+    const { accounts } = normalizeRetirement(makeBody());
+    assert.equal(accounts[0].name, "401k");
+    assert.equal(accounts[1].name, "Roth IRA");
+  });
+
+  it("sorts accounts alphabetically regardless of input order", () => {
+    const body = makeBody();
+    body.accounts = [{ name: "Roth IRA", proxy: "VTI" }, { name: "401k", proxy: "VTI" }];
+    const { accounts } = normalizeRetirement(body);
+    assert.equal(accounts[0].name, "401k");
+    assert.equal(accounts[1].name, "Roth IRA");
+  });
+
+  it("sorts values by date desc, then account asc", () => {
+    const body = makeBody({
+      values: [
+        { date: "2024-01-01", account: "Roth IRA", value: "20000" },
+        { date: "2024-02-01", account: "401k",     value: "50000" },
+        { date: "2024-01-01", account: "401k",     value: "45000" },
+      ],
+    });
+    const { values } = normalizeRetirement(body);
+    assert.equal(values[0].date, "2024-02-01");
+    assert.equal(values[1].account, "401k");
+    assert.equal(values[2].account, "Roth IRA");
+  });
+
+  it("sorts values by account asc regardless of input order (same day, two accounts)", () => {
+    const body = makeBody({
+      values: [
+        { date: "2024-01-01", account: "Roth IRA", value: "20000" },
+        { date: "2024-01-01", account: "401k",     value: "45000" },
+      ],
+    });
+    const { values } = normalizeRetirement(body);
+    assert.equal(values[0].account, "401k");
+    assert.equal(values[1].account, "Roth IRA");
+  });
+
+  it("breaks value ties on numeric value asc when date and account are identical", () => {
+    const body = makeBody({
+      values: [
+        { date: "2024-01-01", account: "401k", value: "50000" },
+        { date: "2024-01-01", account: "401k", value: "45000" },
+      ],
+    });
+    const { values } = normalizeRetirement(body);
+    assert.equal(values[0].value, "45000");
+    assert.equal(values[1].value, "50000");
+  });
+
+  it("sorts contributions by date desc, then account asc", () => {
+    const body = makeBody({
+      contributions: [
+        { date: "2024-01-01", account: "Roth IRA", amount: "500" },
+        { date: "2024-02-01", account: "401k",     amount: "1000" },
+        { date: "2024-01-01", account: "401k",     amount: "800" },
+      ],
+    });
+    const { contributions } = normalizeRetirement(body);
+    assert.equal(contributions[0].date, "2024-02-01");
+    assert.equal(contributions[1].account, "401k");
+    assert.equal(contributions[2].account, "Roth IRA");
+  });
+
+  it("sorts contributions by account asc regardless of input order (same day, two accounts)", () => {
+    const body = makeBody({
+      contributions: [
+        { date: "2024-01-01", account: "Roth IRA", amount: "500" },
+        { date: "2024-01-01", account: "401k",     amount: "800" },
+      ],
+    });
+    const { contributions } = normalizeRetirement(body);
+    assert.equal(contributions[0].account, "401k");
+    assert.equal(contributions[1].account, "Roth IRA");
+  });
+
+  it("breaks contribution ties on numeric amount asc when date and account are identical", () => {
+    const body = makeBody({
+      contributions: [
+        { date: "2024-01-01", account: "401k", amount: "1000" },
+        { date: "2024-01-01", account: "401k", amount: "500" },
+      ],
+    });
+    const { contributions } = normalizeRetirement(body);
+    assert.equal(contributions[0].amount, "500");
+    assert.equal(contributions[1].amount, "1000");
+  });
+
+  it("defaults missing contributions to empty array", () => {
+    const body = { accounts: [], values: [] };
+    const { contributions } = normalizeRetirement(body);
+    assert.deepEqual(contributions, []);
   });
 });

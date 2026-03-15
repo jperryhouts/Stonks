@@ -245,7 +245,8 @@ function normalizeTrades(arr) {
         if (a.date !== b.date) return a.date > b.date ? -1 : 1;
         if (a.symbol !== b.symbol) return a.symbol < b.symbol ? -1 : 1;
         if ((a.type || "") !== (b.type || "")) return (a.type || "") < (b.type || "") ? -1 : 1;
-        return Number(a.quantity) - Number(b.quantity);
+        if (a.quantity !== b.quantity) return Number(a.quantity) - Number(b.quantity);
+        return Number(a.price) - Number(b.price);
     });
     return rows;
 }
@@ -277,6 +278,37 @@ function validateTrades(arr) {
             return `Row ${i + 1}: invalid type (must be "buy", "sell", "donate", or "drip")`;
     }
     return null;
+}
+
+/** Normalize and sort retirement body. Returns { accounts, values, contributions }. */
+function normalizeRetirement(body) {
+    const cleanAccounts = body.accounts.map(a => ({
+        name: a.name.trim(),
+        proxy: (a.proxy || "VTI").trim().toUpperCase(),
+    }));
+    cleanAccounts.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    const cleanValues = body.values.map(v => ({
+        date: v.date,
+        account: v.account.trim(),
+        value: String(Number(v.value)),
+    }));
+    cleanValues.sort((a, b) => {
+        if (a.date !== b.date) return a.date > b.date ? -1 : 1;
+        if (a.account !== b.account) return a.account < b.account ? -1 : 1;
+        return Number(a.value) - Number(b.value);
+    });
+    const contributions = Array.isArray(body.contributions) ? body.contributions : [];
+    const cleanContributions = contributions.map(c => ({
+        date: c.date,
+        account: c.account.trim(),
+        amount: String(Number(c.amount)),
+    }));
+    cleanContributions.sort((a, b) => {
+        if (a.date !== b.date) return a.date > b.date ? -1 : 1;
+        if (a.account !== b.account) return a.account < b.account ? -1 : 1;
+        return Number(a.amount) - Number(b.amount);
+    });
+    return { accounts: cleanAccounts, values: cleanValues, contributions: cleanContributions };
 }
 
 /** Validate retirement body. Returns error string or null. */
@@ -370,37 +402,7 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: retirementErr }));
                 return;
             }
-            const accounts = body.accounts;
-            const values = body.values;
-            const contributions = Array.isArray(body.contributions) ? body.contributions : [];
-            const cleanAccounts = accounts.map(a => ({
-                name: a.name.trim(),
-                proxy: (a.proxy || "VTI").trim().toUpperCase(),
-            }));
-            cleanAccounts.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-            const cleanValues = values.map(v => ({
-                date: v.date,
-                account: v.account.trim(),
-                value: String(Number(v.value)),
-            }));
-            cleanValues.sort((a, b) => {
-                if (a.date !== b.date) return a.date > b.date ? -1 : 1;
-                return a.account < b.account ? -1 : a.account > b.account ? 1 : 0;
-            });
-            const cleanContributions = contributions.map(c => ({
-                date: c.date,
-                account: c.account.trim(),
-                amount: String(Number(c.amount)),
-            }));
-            cleanContributions.sort((a, b) => {
-                if (a.date !== b.date) return a.date > b.date ? -1 : 1;
-                return a.account < b.account ? -1 : a.account > b.account ? 1 : 0;
-            });
-            const clean = {
-                accounts: cleanAccounts,
-                values: cleanValues,
-                contributions: cleanContributions,
-            };
+            const clean = normalizeRetirement(body);
             writeFileAtomic(path.join(DATA_DIR, "retirement.json"), prettyJson(clean));
             res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true, values: clean.values.length }));
@@ -496,4 +498,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, getIP, serverLog, serverWarn };
+module.exports = { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, getIP, serverLog, serverWarn };
