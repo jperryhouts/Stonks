@@ -154,11 +154,13 @@ main { line-height: 1.5; }
 }
 
 #detail-fetched {
-    margin-left: auto;
-    font-size: 0.75rem;
-    color: #aaa;
+    display: block;
+    text-align: right;
+    font-size: 0.7rem;
+    color: #bbb;
     white-space: nowrap;
-    padding-right: 0.75rem;
+    margin-top: 0.3rem;
+    padding-right: 1.5rem;
 }
 
 .detail-expand-btn {
