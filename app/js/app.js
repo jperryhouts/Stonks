@@ -2115,7 +2115,10 @@ document.addEventListener("DOMContentLoaded", async function () {
   var wrap = document.getElementById("chart-wrap");
 
   // chartRef is mutated on resize; listeners read from it directly.
-  var chartRef = setupCanvas(canvas, wrap);
+  // Initialized in requestAnimationFrame to avoid forcing layout before the
+  // browser's first layout pass (fixes Firefox "layout forced before page
+  // fully loaded" console warning).
+  var chartRef = null;
 
   function updateTitle() {
     document.getElementById("tab-chart-btn").textContent = "Overview";
@@ -2203,16 +2206,21 @@ document.addEventListener("DOMContentLoaded", async function () {
     document.getElementById("detail-fetched").textContent = "Fetched " + fetchedLabel;
   }
 
-  drawChart(chartRef, state.data, null);
-  updateTitle();
-  updateDetail(state.data, state.data.chartData.length - 1);
   buildHistoryTable(fullData, retirement, rebuildAll, trades, marketTickers);
   buildGainsPanel(gainsData, fullData, trades, retirement, assets);
   buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG, EXPOSURE_DISPLAY);
   buildSettingsPanel(document.getElementById("panel-settings"), reloadAllData);
   showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
-  attachListeners(canvas, state, chartRef);
-  document.body.classList.remove("loading");
+
+  // Defer canvas setup to rAF so clientWidth is read after layout is complete.
+  requestAnimationFrame(function () {
+    chartRef = setupCanvas(canvas, wrap);
+    drawChart(chartRef, state.data, null);
+    updateTitle();
+    updateDetail(state.data, state.data.chartData.length - 1);
+    attachListeners(canvas, state, chartRef);
+    document.body.classList.remove("loading");
+  });
 
   document.getElementById("banner-dismiss").addEventListener("click", function () {
     document.getElementById("banner").classList.add("hidden");
@@ -2230,7 +2238,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   });
 
   function resizeChart() {
-    if (wrap.clientWidth === 0) return;
+    if (!chartRef || wrap.clientWidth === 0) return;
     var fresh = setupCanvas(canvas, wrap);
     chartRef.ctx = fresh.ctx;
     chartRef.w = fresh.w;
