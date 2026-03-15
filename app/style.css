@@ -200,8 +200,13 @@ main { line-height: 1.5; }
     }
 }
 
+.detail-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 .detail table {
-    width: 100%;
+    min-width: 100%;
     border-collapse: collapse;
     font-size: 0.875rem;
     font-variant-numeric: tabular-nums;
@@ -211,6 +216,7 @@ main { line-height: 1.5; }
 .detail td {
     text-align: right;
     padding: 0.3rem 0.5rem;
+    white-space: nowrap;
 }
 
 .detail th:first-child,
