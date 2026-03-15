@@ -647,7 +647,7 @@ function _histAttachEditHandler(td, date, sym, retirement, rebuildAll, currentVa
   });
   td.addEventListener("touchmove", function () {
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-  });
+  }, { passive: true });
 }
 
 function buildHistoryTable(data, retirement, rebuildAll, trades, marketTickers) {
