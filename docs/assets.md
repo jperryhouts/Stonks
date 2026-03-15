@@ -4,6 +4,11 @@ Some assets don't need market prices — their value can be computed from a form
 
 These are defined in `assets.json`:
 
+> **Browser editor:** Open **Settings → Assets** to edit this file in the
+> browser. Changes are validated before saving.
+
+See the [JSON File Reference](json-reference.md#assetsjson) for a complete field listing.
+
 ```json
 [
   {

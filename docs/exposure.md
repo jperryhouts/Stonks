@@ -10,6 +10,11 @@ This matters for concentration risk. If you're running a portfolio with a handfu
 
 Every symbol in your portfolio maps to one or more **categories** via `exposure.allocations` in `config.json`. Each symbol maps to an object of `{ category: fraction }` pairs — the fraction is the portion of that symbol's value attributed to the category. Fractions for a given symbol must sum to 1.0.
 
+> **Browser editor:** Open **Settings → Config** to edit `config.json`
+> in the browser.
+
+See the [JSON File Reference](json-reference.md#configjson) for a complete `config.json` field listing.
+
 ```json
 {
   "exposure": {
@@ -130,6 +135,7 @@ The solver accounts for symbols that span multiple categories (e.g., selling VTI
 
 When you add a new ticker to your portfolio:
 
-1. Add an allocation entry in `config.json` — fractions for the new symbol must sum to 1.0
+1. Add an allocation entry in `config.json` (or via **Settings → Config**
+   in the browser) — fractions for the new symbol must sum to 1.0
 2. If it belongs to an existing category, you're done
 3. If it's a new category, add a `display` entry (optionally with a `target` for rebalancing)

@@ -14,6 +14,11 @@ Instead, Stonks tracks a **market proxy** — a ticker whose daily price is know
 
 ### Configuration
 
+> **Browser editor:** Open **Settings → Retirement** to edit this file
+> in the browser. Changes are validated before saving.
+
+See the [JSON File Reference](json-reference.md#retirementjson) for a complete field listing.
+
 ```json
 {
   "accounts": [{ "name": "401k", "proxy": "VTI" }],
@@ -103,6 +108,9 @@ Once interpolated, retirement account values are treated like any other symbol:
 - **Performance tab**: shows capital gains (realized/unrealized) for brokerage symbols. Retirement accounts don't have individual trade lots, so they don't appear here.
 
 ## Adding a new retirement account
+
+> **Browser editor:** You can complete steps 1–2 using **Settings →
+> Retirement** in the browser instead of editing the file directly.
 
 1. Add the account definition to `retirement.json`:
    ```json

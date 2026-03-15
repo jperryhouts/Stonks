@@ -1110,3 +1110,40 @@ body:not(.loading) #loading-spinner { display: none; }
     -webkit-appearance: none;
     margin: 0;
 }
+
+/* Settings tab */
+.settings-editor {
+  width: 100%;
+  font-family: monospace;
+  font-size: 0.85rem;
+  min-height: 300px;
+  height: calc(100svh - 160px);
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+  white-space: pre;
+  overflow-x: auto;
+  overflow-y: auto;
+  resize: vertical;
+}
+.settings-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  align-items: center;
+}
+.settings-issues {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 4px;
+}
+.settings-issues.hidden { display: none; }
+.settings-issues ul { margin: 0; padding-left: 1.5rem; }
+.settings-issues li { margin: 0.25rem 0; color: #92400e; font-size: 0.875rem; }
+.settings-success {
+  font-size: 0.875rem;
+  color: #065f46;
+}

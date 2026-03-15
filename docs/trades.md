@@ -2,6 +2,8 @@
 
 `trades.json` is the source of truth for your transaction history. It's a JSON array where each entry represents one trade or event that changes your share count.
 
+See the [JSON File Reference](json-reference.md#tradesjson) for a complete field listing.
+
 ```json
 [
   { "date": "2024-03-15", "symbol": "VTI",  "price": "252.10", "quantity": "10", "type": "buy" },

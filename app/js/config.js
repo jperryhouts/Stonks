@@ -22,6 +22,29 @@
    * @param {object} cfg - Raw config object (from config.json)
    * @returns {object} Parsed config with normalized fields
    */
+  function colorWithAlpha(color, alpha) {
+    var c = color.trim();
+    // Expand 3-digit hex to 6-digit
+    if (/^#[0-9a-fA-F]{3}$/.test(c)) {
+      c = "#" + c[1] + c[1] + c[2] + c[2] + c[3] + c[3];
+    }
+    if (/^#[0-9a-fA-F]{6}$/.test(c)) {
+      var r = parseInt(c.slice(1, 3), 16);
+      var g = parseInt(c.slice(3, 5), 16);
+      var b = parseInt(c.slice(5, 7), 16);
+      return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
+    }
+    if (c.startsWith("rgb(") && c.endsWith(")")) {
+      return "rgba(" + c.slice(4, -1) + "," + alpha + ")";
+    }
+    if (c.startsWith("rgba(") && c.endsWith(")")) {
+      var parts = c.slice(5, -1).split(",");
+      parts[3] = alpha;
+      return "rgba(" + parts.join(",") + ")";
+    }
+    return c;
+  }
+
   function parseConfig(cfg) {
     var result = {
       colors: null,
@@ -35,8 +58,15 @@
 
     if (!cfg) return result;
 
-    if (Array.isArray(cfg.colors) && cfg.colors.length > 0) {
-      result.colors = cfg.colors;
+    // chartColors is the canonical name; colors is accepted for backwards compatibility
+    var rawColors = cfg.chartColors !== undefined ? cfg.chartColors : cfg.colors;
+    if (Array.isArray(rawColors) && rawColors.length > 0) {
+      result.colors = rawColors.map(function (c) {
+        if (typeof c === "string") {
+          return { stroke: c, fill: colorWithAlpha(c, 0.55) };
+        }
+        return c;
+      });
     }
 
     if (cfg.exposure) {
@@ -118,8 +148,12 @@
       result.marginLoanDisplay = "proportional";
     }
 
-    if (cfg.capitalGains && cfg.capitalGains.method === "FIFO") {
-      result.capitalGainsMethod = "FIFO";
+    // defaultMethod is the canonical name; method is accepted for backwards compatibility
+    if (cfg.capitalGains) {
+      var cgMethod = cfg.capitalGains.defaultMethod !== undefined
+        ? cfg.capitalGains.defaultMethod
+        : cfg.capitalGains.method;
+      if (cgMethod === "FIFO") result.capitalGainsMethod = "FIFO";
     }
 
     return result;

@@ -52,7 +52,7 @@ var parseConfig = Portfolio.parseConfig;
 
 /**
  * Load data/config.json and apply to globals. Failures are non-fatal (defaults remain).
- * Structure: { colors: [...], exposure: { allocations: [...], display: [...] } }
+ * Structure: { chartColors: [...], exposure: { allocations: [...], display: [...] } }
  */
 async function loadConfig() {
   try {
@@ -98,6 +98,9 @@ var historyDeltaStyle = Portfolio.historyDeltaStyle;
 
 // Tools — loaded from js/tools.js via Portfolio namespace
 var buildToolsPanel = Portfolio.buildToolsPanel;
+
+// Settings — loaded from js/settings.js via Portfolio namespace
+var buildSettingsPanel = Portfolio.buildSettingsPanel;
 
 // ---------------------------------------------------------------------------
 // Canvas setup
@@ -2120,7 +2123,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   // Tab switching
   var tabs = document.querySelectorAll("#tabs .tab");
-  var panelNames = ["chart", "tools", "gains", "table"];
+  var panelNames = ["chart", "tools", "gains", "table", "settings"];
   for (var ti = 0; ti < tabs.length; ti++) {
     tabs[ti].addEventListener("click", function () {
       var target = this.getAttribute("data-tab");
@@ -2176,6 +2179,12 @@ document.addEventListener("DOMContentLoaded", async function () {
       });
   }
 
+  function reloadAllData() {
+    return loadConfig().then(function() {
+      rebuildAll();
+    });
+  }
+
   var marketTickers = market.length > 0
     ? Object.keys(market[0]).filter(function (k) { return k !== "timestamp"; })
     : [];
@@ -2200,6 +2209,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   buildHistoryTable(fullData, retirement, rebuildAll, trades, marketTickers);
   buildGainsPanel(gainsData, fullData, trades, retirement, assets);
   buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG, EXPOSURE_DISPLAY);
+  buildSettingsPanel(document.getElementById("panel-settings"), reloadAllData);
   showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
   attachListeners(canvas, state, chartRef);
   document.body.classList.remove("loading");

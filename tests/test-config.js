@@ -91,10 +91,23 @@ describe("parseConfig - old format: other fields", () => {
     assert.deepStrictEqual(result.symbolOrder, ["I-Bond", "401k"]);
   });
 
-  it("parses colors", () => {
+  it("parses colors (legacy key)", () => {
     var colors = [{ fill: "rgba(0,0,0,0.5)", stroke: "#000" }];
     var result = parseConfig({ colors: colors });
     assert.deepStrictEqual(result.colors, colors);
+  });
+
+  it("parses chartColors (canonical key)", () => {
+    var colors = [{ fill: "rgba(0,0,0,0.5)", stroke: "#000" }];
+    var result = parseConfig({ chartColors: colors });
+    assert.deepStrictEqual(result.colors, colors);
+  });
+
+  it("chartColors takes precedence over colors when both present", () => {
+    var canonical = [{ fill: "rgba(1,1,1,0.5)", stroke: "#111" }];
+    var legacy = [{ fill: "rgba(2,2,2,0.5)", stroke: "#222" }];
+    var result = parseConfig({ chartColors: canonical, colors: legacy });
+    assert.deepStrictEqual(result.colors, canonical);
   });
 
   it("parses marginLoan.chartDisplay: 'proportional'", () => {
@@ -108,8 +121,18 @@ describe("parseConfig - old format: other fields", () => {
     assert.equal(parseConfig({ marginLoan: { chartDisplay: 123 } }).marginLoanDisplay, null);
   });
 
-  it("parses capitalGains.method: 'FIFO'", () => {
+  it("parses capitalGains.method: 'FIFO' (legacy key)", () => {
     var result = parseConfig({ capitalGains: { method: "FIFO" } });
+    assert.equal(result.capitalGainsMethod, "FIFO");
+  });
+
+  it("parses capitalGains.defaultMethod: 'FIFO' (canonical key)", () => {
+    var result = parseConfig({ capitalGains: { defaultMethod: "FIFO" } });
+    assert.equal(result.capitalGainsMethod, "FIFO");
+  });
+
+  it("capitalGains.defaultMethod takes precedence over capitalGains.method when both present", () => {
+    var result = parseConfig({ capitalGains: { defaultMethod: "FIFO", method: "LIFO" } });
     assert.equal(result.capitalGainsMethod, "FIFO");
   });
 
@@ -117,6 +140,11 @@ describe("parseConfig - old format: other fields", () => {
     assert.equal(parseConfig({ capitalGains: { method: "LIFO" } }).capitalGainsMethod, null);
     assert.equal(parseConfig({ capitalGains: { method: "" } }).capitalGainsMethod, null);
     assert.equal(parseConfig({ capitalGains: { method: "fifo" } }).capitalGainsMethod, null);
+  });
+
+  it("ignores capitalGains.defaultMethod when value is not 'FIFO'", () => {
+    assert.equal(parseConfig({ capitalGains: { defaultMethod: "LIFO" } }).capitalGainsMethod, null);
+    assert.equal(parseConfig({ capitalGains: { defaultMethod: "" } }).capitalGainsMethod, null);
   });
 
   it("returns all nulls for empty config", () => {
@@ -359,7 +387,7 @@ describe("parseConfig - new format: full new-format config round-trip", () => {
   it("parses a complete new-format config correctly", () => {
     var cfg = {
       symbolOrder: ["I-Bond", "401k"],
-      colors: [{ fill: "rgba(0,0,0,0.5)", stroke: "#000" }],
+      chartColors: [{ fill: "rgba(0,0,0,0.5)", stroke: "#000" }],
       exposure: {
         allocations: {
           VTI: { NVDA: 0.067, "Domestic (ex-NVDA)": 0.933 },

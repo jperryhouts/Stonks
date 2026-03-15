@@ -38,6 +38,15 @@ Open http://localhost:8000.
 
 > **Minimum setup:** Steps 1 and 2 are all you need to see your real portfolio. The Overview, History, and Performance tabs work with just `trades.json` and `market.csv`. Steps 3–5 add the Allocation tab exposure breakdown, rebalancing calculator, retirement accounts, and formula-driven assets.
 
+## The Settings tab
+
+Once the server is running, the **Settings** tab lets you edit `config.json`,
+`assets.json`, and `retirement.json` directly in the browser. Each section
+validates your JSON before saving and updates the file on disk. You can use
+the browser editor or edit the files directly — they're the same thing.
+
+See the [JSON File Reference](json-reference.md) for a complete field listing of all data files.
+
 ---
 
 ## Step 1: Replace the sample trades
@@ -92,6 +101,9 @@ The script reads tickers from `trades.json`, fetches prices, and runs a backfill
 The Overview, History, and Performance tabs all work without any configuration. But to enable the Allocation tab breakdown and the rebalancing calculator, you need a `config.json` that maps your symbols to categories.
 
 The easiest approach: edit `data/config.json` (copied from the demo) to match your holdings — delete entries you don't need and adjust categories as needed.
+
+> **Browser editor:** Open **Settings → Config** to edit `config.json`
+> in the browser. Changes are validated before saving.
 
 At minimum, the `config.json` needs an `exposure` section:
 
@@ -172,8 +184,8 @@ Target percentages should sum to 100. Only display rows with a `target` field pa
 ```json
 {
   "symbolOrder": ["Home Equity", "401k"],
-  "capitalGains": { "method": "FIFO" },
-  "colors": [
+  "capitalGains": { "defaultMethod": "FIFO" },
+  "chartColors": [
     { "fill": "rgba(59, 130, 246, 0.55)", "stroke": "#3b82f6" },
     { "fill": "rgba(245, 158, 11, 0.55)", "stroke": "#f59e0b" }
   ]
@@ -181,8 +193,8 @@ Target percentages should sum to 100. Only display rows with a `target` field pa
 ```
 
 - **`symbolOrder`**: symbols listed here are rendered at the bottom of the stacked area chart (visually "behind" other symbols). Useful for pushing stable assets like home equity or retirement accounts to the base of the chart.
-- **`capitalGains.method`**: `"FIFO"` — default lot matching method for gains tracking. Individual sell trades can also specify a `lotDate` field to select a specific purchase lot by date. See [Transaction Log](trades.md) for details.
-- **`colors`**: chart color palette. Colors cycle when there are more symbols than entries.
+- **`capitalGains.defaultMethod`**: `"FIFO"` — default lot matching method for gains tracking. Individual sell trades can also specify a `lotDate` field to select a specific purchase lot by date. See [Transaction Log](trades.md) for details.
+- **`chartColors`**: chart color palette. Colors cycle when there are more symbols than entries.
 
 > **What you get at this point:** The Allocation tab's Rebalancing sub-tab shows the donut chart, exposure breakdown, and the rebalancing calculator.
 
@@ -191,6 +203,9 @@ Target percentages should sum to 100. Only display rows with a `target` field pa
 ## Step 4: Retirement accounts (optional)
 
 If you have employer-sponsored accounts (401k, HSA, 403b) that don't offer daily price feeds, create `data/retirement.json`.
+
+> **Browser editor:** Open **Settings → Retirement** to edit
+> `retirement.json` in the browser.
 
 > **Importing Fidelity 401k / HSA contribution history?** See the [Fidelity importer](#importing-from-fidelity) section at the bottom of this guide.
 
@@ -229,7 +244,10 @@ Ground-truth `values` entries are optional but improve accuracy — they correct
 
 ## Step 5: Deterministic assets (optional)
 
-For assets with formula-driven values (mortgage equity, I-bonds), create `data/assets.json`:
+For assets with formula-driven values (mortgage equity, I-bonds), create `data/assets.json`.
+
+> **Browser editor:** Open **Settings → Assets** to edit `assets.json`
+> in the browser.
 
 ```json
 [
@@ -257,7 +275,9 @@ See [Deterministic Assets](assets.md) for mortgage and I-bond configuration deta
 
 **New trades:** Add them to `trades.json` by hand, or use the Trades sub-tab under History in the browser (which saves back to the server when you click the "Save" button in the UI).
 
-**Retirement values:** Double click any retirement account cell in the History tab to update its ground-truth value, or edit `retirement.json` directly.
+**Retirement values:** Open **Settings → Retirement** to edit
+`retirement.json` in the browser, or double-click any retirement account
+cell in the History tab to update a ground-truth value inline.
 
 **New tickers:** Add to `trades.json` and add allocation entries to `config.json`. Run `docker compose restart fetcher` (or `python3 utils/tickers/fetch_prices.py -d data/` locally) — the fetcher will backfill price history for the new symbol automatically.
 

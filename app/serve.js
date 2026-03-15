@@ -311,6 +311,117 @@ function normalizeRetirement(body) {
     return { accounts: cleanAccounts, values: cleanValues, contributions: cleanContributions };
 }
 
+/** Validate config object. Returns error string or null. */
+function isValidColorString(s) {
+    if (/^#[0-9a-fA-F]{3}$/.test(s)) return true;
+    if (/^#[0-9a-fA-F]{6}$/.test(s)) return true;
+    if (/^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/.test(s)) return true;
+    if (/^rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*[\d.]+\s*\)$/.test(s)) return true;
+    return false;
+}
+
+function validateConfig(obj) {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj))
+        return "Expected a non-null object";
+    // chartColors is the canonical name; colors is accepted for backwards compatibility
+    for (const colorKey of ["chartColors", "colors"]) {
+        if (obj[colorKey] !== undefined) {
+            if (!Array.isArray(obj[colorKey])) return `${colorKey} must be an array`;
+            for (let i = 0; i < obj[colorKey].length; i++) {
+                const c = obj[colorKey][i];
+                if (typeof c === "string") {
+                    if (!isValidColorString(c)) return `${colorKey}[${i}]: invalid color string "${c}"`;
+                    continue;
+                }
+                if (!c || typeof c.fill !== "string") return `${colorKey}[${i}]: fill must be a string`;
+                if (typeof c.stroke !== "string") return `${colorKey}[${i}]: stroke must be a string`;
+            }
+        }
+    }
+    if (obj.symbolOrder !== undefined) {
+        if (!Array.isArray(obj.symbolOrder)) return "symbolOrder must be an array";
+        for (let i = 0; i < obj.symbolOrder.length; i++) {
+            if (typeof obj.symbolOrder[i] !== "string")
+                return `symbolOrder[${i}]: must be a string`;
+        }
+    }
+    if (obj.exposure !== undefined) {
+        if (obj.exposure.allocations !== undefined) {
+            const allocs = obj.exposure.allocations;
+            if (Array.isArray(allocs)) {
+                // Array format: [{ symbol, category, fraction }]
+                const sums = {};
+                for (let i = 0; i < allocs.length; i++) {
+                    const entry = allocs[i];
+                    const sym = entry.symbol;
+                    const frac = Number(entry.fraction);
+                    if (!isNaN(frac)) {
+                        sums[sym] = (sums[sym] || 0) + frac;
+                    }
+                }
+                for (const sym of Object.keys(sums)) {
+                    if (Math.abs(sums[sym] - 1.0) > 0.01)
+                        return `exposure.allocations: fractions for "${sym}" sum to ${sums[sym].toFixed(4)}, expected 1.0`;
+                }
+            } else if (allocs && typeof allocs === "object") {
+                // Object format: { "VTI": { "US Stocks": 0.6, "Bonds": 0.4 } }
+                for (const sym of Object.keys(allocs)) {
+                    const categories = allocs[sym];
+                    if (categories && typeof categories === "object" && !Array.isArray(categories)) {
+                        const vals = Object.values(categories).map(Number).filter(v => !isNaN(v));
+                        const sum = vals.reduce((a, b) => a + b, 0);
+                        if (vals.length > 0 && Math.abs(sum - 1.0) > 0.01)
+                            return `exposure.allocations: fractions for "${sym}" sum to ${sum.toFixed(4)}, expected 1.0`;
+                    }
+                }
+            }
+        }
+        if (obj.exposure.display !== undefined) {
+            if (!Array.isArray(obj.exposure.display)) return "exposure.display must be an array";
+            for (let i = 0; i < obj.exposure.display.length; i++) {
+                const d = obj.exposure.display[i];
+                if (!d || typeof d.name !== "string") return `exposure.display[${i}]: name must be a string`;
+                if (typeof d.color !== "string") return `exposure.display[${i}]: color must be a string`;
+            }
+        }
+        if (obj.exposure.tradeable !== undefined) {
+            if (!Array.isArray(obj.exposure.tradeable)) return "exposure.tradeable must be an array";
+            for (let i = 0; i < obj.exposure.tradeable.length; i++) {
+                if (typeof obj.exposure.tradeable[i] !== "string")
+                    return `exposure.tradeable[${i}]: must be a string`;
+            }
+        }
+    }
+    return null;
+}
+
+/** Validate assets array. Returns error string or null. */
+function validateAssets(arr) {
+    if (!Array.isArray(arr)) return "Expected an array";
+    const VALID_TYPES = new Set(["mortgage", "ibond", "margin_loan"]);
+    for (let i = 0; i < arr.length; i++) {
+        const entry = arr[i];
+        if (!entry.type || !VALID_TYPES.has(entry.type))
+            return `Entry ${i}: unknown type "${entry.type}"`;
+        if (!entry.name) return `Entry ${i}: name is required`;
+        if (entry.type === "mortgage") {
+            for (const field of ["purchaseDate", "homeValue", "downPayment", "loanTermYears", "annualRate"]) {
+                if (entry[field] === undefined || entry[field] === null || entry[field] === "")
+                    return `Entry ${i}: ${field} is required`;
+            }
+        } else if (entry.type === "ibond") {
+            for (const field of ["purchaseDate", "purchaseValue", "fixedRate"]) {
+                if (entry[field] === undefined || entry[field] === null || entry[field] === "")
+                    return `Entry ${i}: ${field} is required`;
+            }
+            if (!Array.isArray(entry.rates)) return `Entry ${i}: rates must be an array`;
+        } else if (entry.type === "margin_loan") {
+            if (!Array.isArray(entry.balances)) return `Entry ${i}: balances must be an array`;
+        }
+    }
+    return null;
+}
+
 /** Validate retirement body. Returns error string or null. */
 function validateRetirement(body) {
     if (!body || typeof body !== "object" || Array.isArray(body))
@@ -415,6 +526,76 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // --- API: save config ---
+    if (pathname === "/api/config" && req.method === "POST") {
+        try {
+            const body = await readBody(req);
+            if (!body || typeof body.content !== "string") {
+                res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: "content must be a string" }));
+                return;
+            }
+            let parsed;
+            try { parsed = JSON.parse(body.content); }
+            catch (e) {
+                res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: "Invalid JSON: " + e.message }));
+                return;
+            }
+            const configErr = validateConfig(parsed);
+            if (configErr) {
+                res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: configErr }));
+                return;
+            }
+            writeFileAtomic(path.join(DATA_DIR, "config.json"), body.content);
+            serverLog(ip, "config saved");
+            res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+            const status = e.statusCode || 500;
+            console.error("POST /api/config error:", e);
+            res.writeHead(status, { ...SEC_HEADERS, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: status === 413 ? "Request body too large" : "Internal server error" }));
+        }
+        return;
+    }
+
+    // --- API: save assets ---
+    if (pathname === "/api/assets" && req.method === "POST") {
+        try {
+            const body = await readBody(req);
+            if (!body || typeof body.content !== "string") {
+                res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: "content must be a string" }));
+                return;
+            }
+            let parsed;
+            try { parsed = JSON.parse(body.content); }
+            catch (e) {
+                res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: "Invalid JSON: " + e.message }));
+                return;
+            }
+            const assetsErr = validateAssets(parsed);
+            if (assetsErr) {
+                res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: assetsErr }));
+                return;
+            }
+            writeFileAtomic(path.join(DATA_DIR, "assets.json"), body.content);
+            serverLog(ip, "assets saved");
+            res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true }));
+        } catch (e) {
+            const status = e.statusCode || 500;
+            console.error("POST /api/assets error:", e);
+            res.writeHead(status, { ...SEC_HEADERS, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: status === 413 ? "Request body too large" : "Internal server error" }));
+        }
+        return;
+    }
+
     // --- Static file serving ---
     if (pathname === "/") pathname = "/index.html";
     if (pathname === "/index.html") serverLog(ip, "page access");
@@ -498,4 +679,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, getIP, serverLog, serverWarn };
+module.exports = { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, validateConfig, validateAssets, getIP, serverLog, serverWarn };
