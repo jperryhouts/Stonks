@@ -93,7 +93,7 @@ The ground truth corrected any drift accumulated over the prior year. Future int
 
 ## Return metrics
 
-The Performance tab (Realized sub-tab) computes TWR and XIRR for each retirement account. Each contribution is converted to a synthetic "buy" trade (quantity 1, price = contribution amount) and fed into these calculations. This tells the returns engine how much external capital entered the account and when.
+The Performance tab computes TWR and XIRR for each retirement account. Each contribution is converted to a synthetic "buy" trade (quantity 1, price = contribution amount) and fed into these calculations. This tells the returns engine how much external capital entered the account and when.
 
 Without contributions, the app would treat the entire account value as investment return — if your 401k is worth $50,000 but you contributed $40,000 of that, XIRR needs to know about the $40,000 to report the correct 25% return instead of treating it as infinite return on zero investment.
 
@@ -103,7 +103,7 @@ Once interpolated, retirement account values are treated like any other symbol:
 
 - **Overview tab**: included in the stacked area chart. Order controlled by `symbolOrder` in `config.json` (retirement accounts are typically placed at the bottom of the stack).
 - **Allocation tab**: included in exposure calculations via fractional allocations (see [Exposure Tracking](exposure.md)). A 401k in a target-date fund can be split across Domestic, International, and Bond categories.
-- **Performance tab (Realized sub-tab)**: TWR and XIRR return metrics are computed here — contributions are the cash flows (see [Return metrics](#return-metrics)).
+- **Performance tab**: TWR and XIRR return metrics are computed here — contributions are the cash flows (see [Return metrics](#return-metrics)).
 - **History tab**: three sub-tabs:
   - **Balances**: shows the interpolated daily value. Ground-truth cells are editable — double-click to update (long-press on mobile).
   - **Retirement Contributions**: browser editor for the contributions array. Select an account from the dropdown to view and edit its entries; add, delete, and save rows without touching the JSON file.

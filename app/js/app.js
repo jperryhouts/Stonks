@@ -1104,38 +1104,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
     return td;
   }
 
-  // -- Sub-tab bar --
-  var subtabBar = document.createElement("div");
-  subtabBar.className = "tools-subtabs";
-
-  var realizedBtn = document.createElement("button");
-  realizedBtn.className = "tools-subtab active";
-  realizedBtn.textContent = "Realized";
-
-  var unrealizedBtn = document.createElement("button");
-  unrealizedBtn.className = "tools-subtab";
-  unrealizedBtn.textContent = "Unrealized";
-
-  subtabBar.appendChild(realizedBtn);
-  subtabBar.appendChild(unrealizedBtn);
-  container.appendChild(subtabBar);
-
   var realizedPanel = document.createElement("div");
-  var unrealizedPanel = document.createElement("div");
-  unrealizedPanel.className = "hidden";
-
-  realizedBtn.addEventListener("click", function () {
-    realizedBtn.classList.add("active");
-    unrealizedBtn.classList.remove("active");
-    realizedPanel.classList.remove("hidden");
-    unrealizedPanel.classList.add("hidden");
-  });
-  unrealizedBtn.addEventListener("click", function () {
-    unrealizedBtn.classList.add("active");
-    realizedBtn.classList.remove("active");
-    unrealizedPanel.classList.remove("hidden");
-    realizedPanel.classList.add("hidden");
-  });
 
   // -- Window selector header (Realized panel) --
   var wHeader = document.createElement("div");
@@ -1259,6 +1228,13 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
         return symbols.filter(function(s) { return active[s]; });
       }
 
+      var perfSection = document.createElement("div");
+      perfSection.className = "gains-section";
+      var perfTitle = document.createElement("h3");
+      perfTitle.className = "gains-section-title";
+      perfTitle.textContent = "Returns";
+      perfSection.appendChild(perfTitle);
+
       var metricsEl = document.createElement("div");
       metricsEl.className = "analysis-metrics wide-table-scroll";
       var mtable = document.createElement("table");
@@ -1266,6 +1242,10 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
 
       var mthead = document.createElement("thead");
       var mhdr1 = document.createElement("tr");
+      var mthBtn = document.createElement("th");
+      mthBtn.className = "analysis-metric-btn-col";
+      mthBtn.setAttribute("rowspan", "2");
+      mhdr1.appendChild(mthBtn);
       var mthLabel = document.createElement("th");
       mthLabel.className = "analysis-metric-label";
       mthLabel.setAttribute("rowspan", "2");
@@ -1302,16 +1282,19 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
         var result = computeReturns(slice, group.trades, metricsCutoff, metricsLast);
 
         var tr = document.createElement("tr");
-        var tdLabel = document.createElement("td");
-        tdLabel.className = "analysis-metric-label";
-
+        var tdBtn = document.createElement("td");
+        tdBtn.className = "analysis-metric-btn-col";
         var btn;
         if (isExpandable) {
           btn = document.createElement("button");
           btn.textContent = "+";
           btn.className = "gains-expand-btn";
-          tdLabel.appendChild(btn);
+          tdBtn.appendChild(btn);
         }
+        tr.appendChild(tdBtn);
+
+        var tdLabel = document.createElement("td");
+        tdLabel.className = "analysis-metric-label";
         tdLabel.appendChild(document.createTextNode(group.name));
         tr.appendChild(tdLabel);
         tr.appendChild(makeMetricTd(result.twr));
@@ -1332,6 +1315,9 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
 
             var subTr = document.createElement("tr");
             subTr.className = "analysis-metrics-sub-row hidden";
+            var subBtnTd = document.createElement("td");
+            subBtnTd.className = "analysis-metric-btn-col";
+            subTr.appendChild(subBtnTd);
             var subLabel = document.createElement("td");
             subLabel.className = "analysis-metric-label analysis-metric-sub-label";
             subLabel.textContent = sym;
@@ -1362,7 +1348,8 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
 
       mtable.appendChild(mtbody);
       metricsEl.appendChild(mtable);
-      realizedContent.appendChild(metricsEl);
+      perfSection.appendChild(metricsEl);
+      realizedContent.appendChild(perfSection);
     }
 
     // Compute cutoff / endDate
@@ -1405,31 +1392,22 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
     realizedTitle.textContent = "Realized Gains";
     realizedSection.appendChild(realizedTitle);
 
-    var summaryWrap = document.createElement("div");
-    summaryWrap.className = "gains-summary wide-table-scroll";
-    var sTable = document.createElement("table");
-    sTable.className = "gains-summary-table";
-    var sThead = document.createElement("thead");
-    var sHr = document.createElement("tr");
-    ["", "Short-Term", "Long-Term"].forEach(function (h) {
-      var th = document.createElement("th");
-      th.textContent = h;
-      if (h !== "") th.className = "gains-num";
-      sHr.appendChild(th);
+    var statTable = document.createElement("table");
+    statTable.className = "gains-stat-table";
+    var statBody = document.createElement("tbody");
+    [
+      ["Short-term (" + winLabel + ")", stFiltered],
+      ["Long-term (" + winLabel + ")", ltFiltered]
+    ].forEach(function(row) {
+      var tr = document.createElement("tr");
+      var labelTd = document.createElement("td");
+      labelTd.textContent = row[0];
+      tr.appendChild(labelTd);
+      tr.appendChild(makeCell(fmtDollar(row[1]), true, row[1]));
+      statBody.appendChild(tr);
     });
-    sThead.appendChild(sHr);
-    sTable.appendChild(sThead);
-    var sTbody = document.createElement("tbody");
-    var sRowStr = document.createElement("tr");
-    var sRowLabel = document.createElement("td");
-    sRowLabel.textContent = "Total (" + winLabel + ")";
-    sRowStr.appendChild(sRowLabel);
-    sRowStr.appendChild(makeCell(fmtDollar(stFiltered), true, stFiltered));
-    sRowStr.appendChild(makeCell(fmtDollar(ltFiltered), true, ltFiltered));
-    sTbody.appendChild(sRowStr);
-    sTable.appendChild(sTbody);
-    summaryWrap.appendChild(sTable);
-    realizedSection.appendChild(summaryWrap);
+    statTable.appendChild(statBody);
+    realizedSection.appendChild(statTable);
 
     if (filteredRealized.length === 0) {
       var emptyP = document.createElement("p");
@@ -1551,31 +1529,21 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
   });
 
   // -- Unrealized summary --
-  var uSummaryWrap = document.createElement("div");
-  uSummaryWrap.className = "gains-summary wide-table-scroll";
-  var uSTable = document.createElement("table");
-  uSTable.className = "gains-summary-table";
-  var uSThead = document.createElement("thead");
-  var uSHr = document.createElement("tr");
-  ["", "Short-Term", "Long-Term"].forEach(function (h) {
-    var th = document.createElement("th");
-    th.textContent = h;
-    if (h !== "") th.className = "gains-num";
-    uSHr.appendChild(th);
+  var uStatTable = document.createElement("table");
+  uStatTable.className = "gains-stat-table";
+  var uStatBody = document.createElement("tbody");
+  [
+    ["Short-term", summary.stUnrealized],
+    ["Long-term", summary.ltUnrealized]
+  ].forEach(function(row) {
+    var tr = document.createElement("tr");
+    var labelTd = document.createElement("td");
+    labelTd.textContent = row[0];
+    tr.appendChild(labelTd);
+    tr.appendChild(makeCell(fmtDollar(row[1]), true, row[1]));
+    uStatBody.appendChild(tr);
   });
-  uSThead.appendChild(uSHr);
-  uSTable.appendChild(uSThead);
-  var uSTbody = document.createElement("tbody");
-  var uSRow = document.createElement("tr");
-  var uSLabel = document.createElement("td");
-  uSLabel.textContent = "Unrealized";
-  uSRow.appendChild(uSLabel);
-  uSRow.appendChild(makeCell(fmtDollar(summary.stUnrealized), true, summary.stUnrealized));
-  uSRow.appendChild(makeCell(fmtDollar(summary.ltUnrealized), true, summary.ltUnrealized));
-  uSTbody.appendChild(uSRow);
-  uSTable.appendChild(uSTbody);
-  uSummaryWrap.appendChild(uSTable);
-  unrealizedPanel.appendChild(uSummaryWrap);
+  uStatTable.appendChild(uStatBody);
 
   // -- Unrealized gains table --
   var unrealizedSection = document.createElement("div");
@@ -1584,6 +1552,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
   unrealizedTitle.className = "gains-section-title";
   unrealizedTitle.textContent = "Unrealized Gains";
   unrealizedSection.appendChild(unrealizedTitle);
+  unrealizedSection.appendChild(uStatTable);
 
   if (unrealized.length === 0) {
     var emptyP2 = document.createElement("p");
@@ -1680,10 +1649,9 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
     uWrap.appendChild(uTable);
     unrealizedSection.appendChild(uWrap);
   }
-  unrealizedPanel.appendChild(unrealizedSection);
+  realizedPanel.appendChild(unrealizedSection);
 
   container.appendChild(realizedPanel);
-  container.appendChild(unrealizedPanel);
 }
 
 // ---------------------------------------------------------------------------

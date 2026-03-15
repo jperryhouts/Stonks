@@ -608,6 +608,22 @@ main { line-height: 1.5; }
     border-bottom: 1px solid #f0f0f0;
 }
 
+.gains-stat-table {
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 0.75rem;
+}
+.gains-stat-table td {
+    padding: 0.15rem 0.75rem 0.15rem 0;
+    color: #666;
+}
+.gains-stat-table td.gains-num {
+    text-align: right;
+    padding-right: 0;
+    min-width: 5.5rem;
+}
+
 .gains-section {
     margin-bottom: 1.5rem;
 }
@@ -793,8 +809,6 @@ body:not(.loading) #loading-spinner { display: none; }
 }
 
 .analysis-metrics {
-    margin-bottom: 1.5rem;
-    padding-bottom: 1.25rem;
 }
 
 .analysis-metrics-table {
@@ -818,12 +832,10 @@ body:not(.loading) #loading-spinner { display: none; }
 }
 
 .analysis-metrics-table th {
-    padding: 0.1rem 0 0.45rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #999;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    padding: 0.15rem 0;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #666;
 }
 
 .analysis-metrics-table th:not(:first-child) {
@@ -853,18 +865,25 @@ body:not(.loading) #loading-spinner { display: none; }
 /* Group-span header cells ("Annualized" / "Cumulative") */
 .analysis-metric-group-header {
     text-align: center;
-    padding-bottom: 0.2rem;
-    border-left: 1px solid #e8e8e8;
-    color: #888;
+    color: #666;
     white-space: nowrap;
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-size: 0.8125rem;
+    font-weight: 500;
 }
 
 .analysis-metrics-table th.analysis-metric-group-header {
     text-align: center;
+}
+
+.analysis-metrics-table thead tr:last-child th {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.analysis-metric-btn-col {
+    width: 1.5rem;
+    min-width: 1.5rem;
+    padding-right: 0;
+    vertical-align: middle;
 }
 
 /* Sub-rows: individual symbol lines under Investments */
@@ -878,7 +897,7 @@ body:not(.loading) #loading-spinner { display: none; }
     font-weight: 500;
 }
 .analysis-metric-sub-label {
-    padding-left: 1.5rem;
+    padding-left: 0.5rem;
     color: #777;
 }
 
