@@ -13,7 +13,7 @@ A personal portfolio tracker built on plain text files, zero dependencies, and f
 
 ## Features
 
-Tracks stocks, ETFs, and individual equities via daily market prices, retirement accounts (401k, HSA, 403b) via proxy-based interpolation, and formula-driven assets like mortgage equity and I-bonds. Four tabs covering different aspects of portfolio tracking:
+Tracks stocks, ETFs, and individual equities via daily market prices, retirement accounts (401k, HSA, 403b) via proxy-based interpolation, and formula-driven assets like mortgage equity and I-bonds. Five tabs covering different aspects of portfolio tracking:
 
 **Overview** -- Stacked area chart with time window filtering and hover detail panel.
 
@@ -25,11 +25,17 @@ Tracks stocks, ETFs, and individual equities via daily market prices, retirement
 
 ![Performance — realized, unrealized, and donation tracking](docs/screenshots/performance.png)
 
-**History** -- Daily portfolio values table (Balances sub-tab) and editable transaction log (Trades sub-tab). Balances supports inline editing for retirement account ground-truth values; Trades saves back to the server.
+**History** -- Three sub-tabs, all with save-to-server support: Balances (daily portfolio values with inline editing for retirement account ground-truth values), Trades (editable transaction log supporting buys, sells, DRIPs, and donations), and Retirement Contributions (contribution history editor for manual accounts).
 
 ![History — daily values per symbol](docs/screenshots/history.png)
 
 ![Trades — transaction log with buys, sells, DRIPs, and donations](docs/screenshots/trades.png)
+
+![Retirement Contributions — contribution history editor](docs/screenshots/retirement-contributions.png)
+
+**Settings** -- Browser-based JSON editor with sub-tabs for direct manual edits to the underlying json data files. Includes client-side validation before each save.
+
+![Settings — JSON editor for config, assets, and retirement data](docs/screenshots/settings.png)
 
 ## Quickstart
 
@@ -87,7 +93,9 @@ Key files:
 ## Testing
 
 ```bash
-node --test tests/
+make test             # runs all tests (JS + Python)
+node --test tests/    # JS tests only
+make test-python      # Python tests only
 ```
 
-Uses Node's built-in `node:test` runner. No additional test dependencies.
+JS tests use Node's built-in `node:test` runner. Python tests use `unittest`. No additional test dependencies.
