@@ -301,7 +301,7 @@ function normalizeRetirement(body) {
     const cleanContributions = contributions.map(c => ({
         date: c.date,
         account: c.account.trim(),
-        amount: String(Number(c.amount)),
+        amount: String(Number(String(c.amount).replace(/[$,]/g, "").trim())),
     }));
     cleanContributions.sort((a, b) => {
         if (a.date !== b.date) return a.date > b.date ? -1 : 1;
@@ -449,7 +449,8 @@ function validateRetirement(body) {
             return `Contribution ${i + 1}: invalid date (expected YYYY-MM-DD)`;
         if (!c.account || typeof c.account !== "string" || c.account.trim() === "")
             return `Contribution ${i + 1}: account is required`;
-        if (c.amount === "" || !isFinite(Number(c.amount)) || Number(c.amount) <= 0)
+        const cAmountNum = Number(String(c.amount).replace(/[$,]/g, "").trim());
+        if (!isFinite(cAmountNum) || cAmountNum <= 0)
             return `Contribution ${i + 1}: invalid amount (must be positive number)`;
     }
     return null;
