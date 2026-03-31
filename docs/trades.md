@@ -40,6 +40,25 @@ The `type` field determines the transaction type. Quantity is always positive �
 
 You can also add a `note` field to any trade for your own reference — it's displayed in the Trades sub-tab but doesn't affect calculations.
 
+## Wash Sales
+
+The IRS wash sale rule disallows a realized loss when you buy the same security within 30 days before or after the sale. The disallowed amount is added to the replacement lot's cost basis instead, deferring (not eliminating) the tax benefit.
+
+The Performance tab automatically detects wash sales from your `trades.json` data at runtime — no data files are modified. Detection uses the same-symbol matching rule:
+
+- **Look-back**: if you bought the same ticker within 30 days *before* a loss sale, those recent shares are treated as replacement shares.
+- **Look-forward**: if you buy the same ticker within 30 days *after* a loss sale, the new lot's cost basis is increased by the disallowed amount.
+
+In the Realized Gains table, wash sale entries show:
+- The original (disallowed) loss in strikethrough
+- The adjusted gain/loss after disallowance
+- A **⚠ WS** badge with the disallowed dollar amount on hover
+- A detail row below with the replacement lot's purchase date
+
+The adjusted cost basis carries forward automatically — if you later sell the replacement lot, the gain calculation uses the higher basis.
+
+Charitable donation sells (`type: "donate"`) are excluded from wash sale detection since they don't generate tax losses.
+
 ## Tips
 
 - Enter trades in chronological order (the app sorts them, but it's easier to read)

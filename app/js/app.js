@@ -1384,6 +1384,12 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
       else stFiltered += filteredRealized[fi].gain;
     }
 
+    // Total wash sale disallowed for footnote
+    var totalWashDisallowed = 0;
+    for (var wfi = 0; wfi < filteredRealized.length; wfi++) {
+      totalWashDisallowed += filteredRealized[wfi].washSaleDisallowed || 0;
+    }
+
     // -- Realized gains table --
     var realizedSection = document.createElement("div");
     realizedSection.className = "gains-section";
@@ -1408,6 +1414,14 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
     });
     statTable.appendChild(statBody);
     realizedSection.appendChild(statTable);
+
+    if (totalWashDisallowed > 0.005) {
+      var wsFn = document.createElement("p");
+      wsFn.className = "wash-sale-footnote";
+      wsFn.textContent = "* " + fmtDollar(totalWashDisallowed) +
+        " in wash sale losses deferred to replacement lot cost basis";
+      realizedSection.appendChild(wsFn);
+    }
 
     if (filteredRealized.length === 0) {
       var emptyP = document.createElement("p");
@@ -1451,12 +1465,48 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
           rtr.appendChild(makeCell(fmtShares(r.shares), true, null));
           rtr.appendChild(makeCell(fmtDollar(r.costBasis), true, null));
           rtr.appendChild(makeCell(fmtDollar(r.proceeds), true, null));
-          var gainText = (r.gain >= 0 ? "+" : "") + fmtDollar(r.gain);
-          rtr.appendChild(makeCell(gainText, true, r.gain));
+          // Gain/Loss cell — show wash sale adjustment if present
+          var gainTd = document.createElement("td");
+          gainTd.className = "gains-num";
+          if (r.washSaleDisallowed) {
+            var rawSpan = document.createElement("del");
+            rawSpan.className = "wash-sale-raw";
+            rawSpan.textContent = (r.washSaleRawGain >= 0 ? "+" : "") + fmtDollar(r.washSaleRawGain);
+            var adjSpan = document.createElement("span");
+            adjSpan.style.color = r.gain >= 0 ? "#16a34a" : "#dc2626";
+            adjSpan.textContent = " " + (r.gain >= 0 ? "+" : "") + fmtDollar(r.gain);
+            var wsBadge = document.createElement("span");
+            wsBadge.className = "wash-sale-badge";
+            wsBadge.title = "Wash sale \u2014 " + fmtDollar(r.washSaleDisallowed) + " disallowed";
+            wsBadge.textContent = " \u26a0 WS";
+            gainTd.appendChild(rawSpan);
+            gainTd.appendChild(adjSpan);
+            gainTd.appendChild(wsBadge);
+          } else {
+            gainTd.style.color = r.gain >= 0 ? "#16a34a" : "#dc2626";
+            gainTd.textContent = (r.gain >= 0 ? "+" : "") + fmtDollar(r.gain);
+          }
+          rtr.appendChild(gainTd);
           rtr.appendChild(makeCell(r.holdDays != null ? r.holdDays + "d" : "\u2014", true, null));
           rtr.appendChild(makeCell(r.isLongTerm === null ? "\u2014" : r.isLongTerm ? "Long" : "Short", true, null));
         }
         rTbody.appendChild(rtr);
+        // Wash sale detail sub-row
+        if (r.washSaleDisallowed) {
+          var repDates = (r.washSaleReplacements || []).map(function(rep) { return rep.date; });
+          // Deduplicate dates
+          var seen = {};
+          var uniqDates = repDates.filter(function(d) { return seen[d] ? false : (seen[d] = true); });
+          var wsDetailTr = document.createElement("tr");
+          wsDetailTr.className = "wash-sale-detail-row";
+          var wsDetailTd = document.createElement("td");
+          wsDetailTd.colSpan = 8;
+          wsDetailTd.textContent = "Wash sale \u2014 " + fmtDollar(r.washSaleDisallowed) +
+            " disallowed, added to replacement lot basis" +
+            (uniqDates.length ? " (purchased " + uniqDates.join(", ") + ")" : "");
+          wsDetailTr.appendChild(wsDetailTd);
+          rTbody.appendChild(wsDetailTr);
+        }
       }
       rTable.appendChild(rTbody);
       var rWrap = document.createElement("div");

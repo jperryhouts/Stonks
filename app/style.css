@@ -687,6 +687,32 @@ main { line-height: 1.5; }
     padding: 0.2rem 0.6rem;
 }
 
+.wash-sale-raw {
+    color: inherit;
+    opacity: 0.45;
+}
+
+.wash-sale-badge {
+    color: #f59e0b;
+    font-size: 0.82em;
+    font-weight: bold;
+    cursor: default;
+}
+
+.wash-sale-detail-row td {
+    font-size: 0.8125rem;
+    color: #888;
+    padding-left: 2em !important;
+    border-top: none !important;
+    font-style: italic;
+}
+
+.wash-sale-footnote {
+    font-size: 0.8125rem;
+    color: #888;
+    margin: 0.25rem 0 0.5rem 0;
+}
+
 .gains-window-header {
     display: flex;
     align-items: center;
