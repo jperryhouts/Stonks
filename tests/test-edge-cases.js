@@ -1,9 +1,9 @@
 /**
  * Edge case tests for portfolio tracker modules.
  *
- * Tests marked "TODO" reveal bugs in the current implementation — they assert
- * the *correct* expected behavior and will fail until the underlying bug is fixed.
- * Each TODO comment explains the current (wrong) behavior and what's expected.
+ * Tests with "Previously broken" comments document bugs that have since been
+ * fixed. The assertions capture the correct expected behavior and serve as
+ * regression guards.
  */
 
 const { describe, it } = require("node:test");
@@ -47,12 +47,10 @@ const MARKET = [
 // ---------------------------------------------------------------------------
 
 describe("niceMax — extreme inputs", () => {
-  it("returns a finite number for NaN input (TODO: currently returns NaN)", () => {
-    // TODO: Bug — niceMax(NaN) returns NaN. The guard `if (v <= 0)` is skipped
-    // because NaN comparisons always return false, so all subsequent arithmetic
-    // with NaN propagates NaN. This can break Y-axis rendering if a portfolio
-    // total ever becomes NaN (e.g., due to malformed market price data).
-    // Expected: treat NaN like zero/invalid and return 1.
+  it("returns a finite number for NaN input", () => {
+    // Previously broken: niceMax(NaN) returned NaN because the guard `if (v <= 0)`
+    // is skipped for NaN (NaN comparisons return false). Fixed: guard changed to
+    // `if (!Number.isFinite(v) || v <= 0)` which catches NaN and Infinity.
     const result = niceMax(NaN);
     assert.ok(
       Number.isFinite(result),
@@ -60,11 +58,9 @@ describe("niceMax — extreme inputs", () => {
     );
   });
 
-  it("returns a finite number for Infinity input (TODO: currently returns Infinity)", () => {
-    // TODO: Bug — niceMax(Infinity) propagates Infinity through Math.log10 and
-    // Math.pow, ultimately returning Infinity. This would make the chart Y-axis
-    // unbounded. Could arise from runaway floating-point accumulation.
-    // Expected: some reasonable clamped value or at least a finite number.
+  it("returns a finite number for Infinity input", () => {
+    // Previously broken: niceMax(Infinity) propagated Infinity through Math.log10
+    // and Math.pow. Fixed: same guard as the NaN fix handles Infinity.
     const result = niceMax(Infinity);
     assert.ok(
       Number.isFinite(result),
@@ -115,12 +111,10 @@ describe("processData — same-day multi-transaction edge cases", () => {
     assert.equal(result.chartData[2].values.VTI, 0); // still zero on day 3
   });
 
-  it("sell more than owned produces a negative position (TODO: should be flagged)", () => {
-    // TODO: Bug — processData allows a running position to go negative when a sell
-    // quantity exceeds the currently-held shares. A negative position produces a
-    // negative portfolio value, which silently corrupts the chart. The position
-    // should either be clamped to zero or the transaction should be rejected.
-    // Current behavior: positions.VTI = 3 + (−5) = −2.
+  it("sell more than owned does not produce a negative position", () => {
+    // Previously broken: processData allowed running positions to go negative when
+    // a sell quantity exceeded currently-held shares (3 + (−5) = −2), silently
+    // corrupting chart values. Fixed: positions are now clamped at zero.
     const trades = [
       { date: "2024-01-02", symbol: "VTI", price: "100", quantity: "3" },
       { date: "2024-01-03", symbol: "VTI", price: "105", quantity: "-5" }, // sell 5, only own 3
@@ -153,11 +147,10 @@ describe("processData — same-day multi-transaction edge cases", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeGains — overselling", () => {
-  it("FIFO: emits a warning when selling more shares than available (TODO: currently silent)", () => {
-    // TODO: Bug — the FIFO path silently stops consuming lots when they are
-    // exhausted without emitting any warning row. Selling 10 shares when only 5
-    // exist should produce a warning about the 5 unmatched shares, consistent
-    // with how specific-ID insufficient-shares warnings work.
+  it("FIFO: emits a warning when selling more shares than available", () => {
+    // Previously broken: the FIFO path silently stopped consuming lots when they
+    // were exhausted without emitting any warning row. Fixed: FIFO now emits a
+    // warning entry for the unmatched shares, consistent with the specific-ID path.
     const trades = [
       buy("2024-01-01", "VTI", 100, 5),
       sell("2024-06-01", "VTI", 150, 10), // only 5 available
@@ -225,13 +218,11 @@ describe("mergeRetirement — proxy not in market data", () => {
     { timestamp: "2024-01-03 16:00", VTI: "110" },
   ];
 
-  it("shows ground-truth value on GT date when proxy is missing (TODO: currently shows $0)", () => {
-    // TODO: Bug — when the proxy ticker is absent from market data, proxyPrice
-    // evaluates to 0 via `parseFloat(undefined) || 0`. The condition
-    // `if (activeVal > 0 && basePrice > 0 && proxyPrice > 0)` then short-circuits
-    // and the account value is silently set to $0 for all days.
-    // Expected: when the proxy is unavailable, show the raw GT value (ratio = 1.0)
-    // rather than $0, so at least the last-known balance is visible in the chart.
+  it("shows ground-truth value on GT date when proxy is missing", () => {
+    // Previously broken: when the proxy ticker was absent from market data,
+    // proxyPrice evaluated to 0, short-circuiting the condition and setting the
+    // account value to $0 for all days. Fixed: the GT value is now shown with
+    // ratio=1.0 when the proxy is unavailable.
     const chartData = [
       { date: "2024-01-02", prices: { VTI: "100" }, values: {}, cumulative: [], total: 0 },
       { date: "2024-01-03", prices: { VTI: "110" }, values: {}, cumulative: [], total: 0 },
@@ -257,11 +248,10 @@ describe("mergeRetirement — proxy not in market data", () => {
 describe("mergeRetirement — duplicate account names", () => {
   const MARKET_SMALL = [{ timestamp: "2024-01-02 16:00", VTI: "100" }];
 
-  it("duplicate account names should not appear twice in symbols (TODO: currently duplicated)", () => {
-    // TODO: Bug — each entry in retirement.accounts calls `symbols.push(name)`
-    // unconditionally. If two accounts share the same name, that name appears
-    // twice in the symbols array, and rebuildCumulatives will add the account's
-    // value to the running total twice, doubling the reported portfolio value.
+  it("duplicate account names should not appear twice in symbols", () => {
+    // Previously broken: each entry in retirement.accounts called `symbols.push(name)`
+    // unconditionally, duplicating the symbol and doubling the portfolio total.
+    // Fixed: duplicate account names are deduplicated before pushing.
     const chartData = [
       { date: "2024-01-02", prices: { VTI: "100" }, values: {}, cumulative: [], total: 0 },
     ];
@@ -278,8 +268,8 @@ describe("mergeRetirement — duplicate account names", () => {
     assert.equal(count, 1, "duplicate account name should produce only one entry in symbols");
   });
 
-  it("duplicate account names double the portfolio total (confirms buggy behaviour)", () => {
-    // Companion to the test above: total should be 10000, not 20000.
+  it("duplicate account names do not double the portfolio total", () => {
+    // Companion to the test above: total should be 10000, not 20000 (previously double-counted).
     const chartData = [
       { date: "2024-01-02", prices: { VTI: "100" }, values: {}, cumulative: [], total: 0 },
     ];
@@ -295,7 +285,7 @@ describe("mergeRetirement — duplicate account names", () => {
     assert.equal(
       data.chartData[0].total,
       10000,
-      "total should be $10,000, not $20,000 (currently double-counted)"
+      "total should be $10,000, not $20,000 (previously double-counted when duplicate account names were present)"
     );
   });
 });
@@ -331,11 +321,10 @@ describe("mergeRetirement — account with no GT values", () => {
 // ---------------------------------------------------------------------------
 
 describe("csvToJson — RFC 4180 compliance", () => {
-  it("handles a quoted field containing an embedded comma (TODO: currently splits incorrectly)", () => {
-    // TODO: Bug — csvToJson uses a naive `line.split(",")` that does not respect
-    // RFC 4180 quoting. Any field that contains a comma inside double-quotes will
-    // be incorrectly split into multiple columns. For market.csv this rarely
-    // matters, but it would break any CSV import where notes contain commas.
+  it("handles a quoted field containing an embedded comma", () => {
+    // Previously broken: csvToJson used a naive `line.split(",")` that did not
+    // respect RFC 4180 quoting, splitting quoted fields at embedded commas. Fixed:
+    // RFC 4180-compliant parsing now handles quoted fields correctly.
     const csv = 'timestamp,note\n2024-01-02,"value, with comma"';
     const result = csvToJson(csv);
     assert.equal(result.length, 1);
@@ -357,11 +346,10 @@ describe("csvToJson — RFC 4180 compliance", () => {
 // ---------------------------------------------------------------------------
 
 describe("validateTrades — boundary cases", () => {
-  it("rejects a regex-passing but calendar-invalid date like 2024-02-31 (TODO: not caught)", () => {
-    // TODO: Bug — validateTrades checks only `^\d{4}-\d{2}-\d{2}$` (regex),
-    // not whether the date is a real calendar date. February 31, April 31, etc.
-    // all pass. These dates can cause `new Date("2024-02-31")` to silently roll
-    // over to March 2, corrupting holding-period calculations in computeGains.
+  it("rejects a regex-passing but calendar-invalid date like 2024-02-31", () => {
+    // Previously broken: validateTrades checked only the regex `^\d{4}-\d{2}-\d{2}$`,
+    // not whether the date was a real calendar date. Fixed: UTC round-trip check
+    // now rejects dates that JavaScript silently rolls over (e.g., Feb 31 → Mar 2).
     const err = validateTrades([
       { date: "2024-02-31", symbol: "VTI", price: "100", quantity: "10" },
     ]);
@@ -420,9 +408,9 @@ describe("validateTrades — boundary cases", () => {
     assert.equal(err, null, "future dates are currently accepted (no future-date guard)");
   });
 
-  it("rejects a month value out of range (13th month) via calendar check (TODO: not caught)", () => {
-    // TODO: Same root cause as 2024-02-31 — pure regex allows month 13.
-    // new Date("2024-13-01") silently becomes January 1, 2025.
+  it("rejects a month value out of range (13th month) via calendar check", () => {
+    // Previously broken: same root cause as 2024-02-31 — pure regex allowed month 13.
+    // Fixed: same UTC round-trip check catches this (2024-13-01 → Jan 1, 2025).
     const err = validateTrades([
       { date: "2024-13-01", symbol: "VTI", price: "100", quantity: "10" },
     ]);

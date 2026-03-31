@@ -12,7 +12,7 @@ stop:
 	pkill -f "serve.js" || true
 
 test-python:
-	python3 -m unittest discover -s tests/ -p "test_fetcher.py" -v
+	python3 -m unittest discover -s tests/ -p "test_*.py" -v
 
 test: test-python
 	node --test tests/

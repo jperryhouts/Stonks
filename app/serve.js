@@ -679,4 +679,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, validateConfig, validateAssets, getIP, serverLog, serverWarn };
+module.exports = { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, validateConfig, validateAssets, getIP, serverLog, serverWarn, server };

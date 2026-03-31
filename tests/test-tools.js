@@ -703,3 +703,55 @@ describe("computeContributions - withdrawal", () => {
     assert.ok(result.newTotal >= 0, "newTotal is never negative");
   });
 });
+
+// ---------------------------------------------------------------------------
+// computeRebalancing — edge cases
+// ---------------------------------------------------------------------------
+
+describe("computeRebalancing - zero portfolio", () => {
+  it("does not throw when portfolio total is zero", () => {
+    var fullData = makeFullData({ VTI: 0, BND: 0 });
+    var exposureMap = { VTI: { Stocks: 1.0 }, BND: { Bonds: 1.0 } };
+    var rebalCats = [
+      { name: "Stocks", category: "Stocks" },
+      { name: "Bonds", category: "Bonds" },
+    ];
+    var targets = { Stocks: 60, Bonds: 40 };
+    // Should not throw
+    var result = computeRebalancing(fullData, exposureMap, rebalCats, targets);
+    assert.equal(result.portfolioTotal, 0);
+  });
+
+  it("does not throw with empty symbols", () => {
+    var fullData = { symbols: [], chartData: [{ date: "2026-01-01", values: {}, cumulative: [] }] };
+    var result = computeRebalancing(fullData, {}, [], {});
+    assert.equal(result.portfolioTotal, 0);
+    assert.deepEqual(result.categories, []);
+  });
+});
+
+describe("computeRebalancing - symbol in exposureMap but absent from fullData", () => {
+  it("treats missing symbol value as zero", () => {
+    // BND is in the exposureMap but not in fullData.values
+    var fullData = makeFullData({ VTI: 10000 });
+    var exposureMap = {
+      VTI: { Stocks: 1.0 },
+      BND: { Bonds: 1.0 },  // BND absent from fullData
+    };
+    var rebalCats = [
+      { name: "Stocks", category: "Stocks" },
+      { name: "Bonds", category: "Bonds" },
+    ];
+    var targets = { Stocks: 80, Bonds: 20 };
+
+    var result = computeRebalancing(fullData, exposureMap, rebalCats, targets);
+
+    // portfolioTotal should only count what's actually in the data
+    assert.equal(result.portfolioTotal, 10000);
+
+    var bonds = result.categories.find((c) => c.name === "Bonds");
+    // BND is absent → current value of Bonds category is 0
+    assert.ok(Math.abs(bonds.currentValue) < 0.01,
+      `Expected Bonds currentValue ~0, got ${bonds.currentValue}`);
+  });
+});

@@ -1091,3 +1091,73 @@ describe("computeGains drip trade type", () => {
   });
 
 });
+
+// ---------------------------------------------------------------------------
+// computeGains — FIFO lot exhaustion (overselling)
+// ---------------------------------------------------------------------------
+
+describe("computeGains - FIFO lot exhaustion", () => {
+  // Market data for the test
+  const MARKET = [
+    { timestamp: "2024-06-01 16:00", VTI: "250" },
+  ];
+
+  it("produces a warning entry when selling more shares than owned", () => {
+    // Buy 5 shares, then attempt to sell 8 (3 more than exist in FIFO).
+    const trades = [
+      { date: "2024-01-02", symbol: "VTI", price: "200", quantity: "5", type: "buy" },
+      { date: "2024-06-01", symbol: "VTI", price: "250", quantity: "8", type: "sell" },
+    ];
+    const { realized } = computeGains(trades, MARKET);
+
+    // Should have two realized entries: the 5-share FIFO match + a 3-share warning
+    const warning = realized.find((r) => r.warning);
+    assert.ok(warning, "Expected a warning entry for oversold shares");
+    assert.ok(warning.warning.includes("Insufficient shares"),
+      `Unexpected warning text: ${warning.warning}`);
+  });
+
+  it("warning entry has zero gain and zero cost basis", () => {
+    const trades = [
+      { date: "2024-01-02", symbol: "VTI", price: "200", quantity: "5", type: "buy" },
+      { date: "2024-06-01", symbol: "VTI", price: "250", quantity: "8", type: "sell" },
+    ];
+    const { realized } = computeGains(trades, MARKET);
+    const warning = realized.find((r) => r.warning);
+
+    assert.equal(warning.gain, 0);
+    assert.equal(warning.costBasis, 0);
+    assert.equal(warning.holdDays, null);
+    assert.equal(warning.isLongTerm, null);
+  });
+
+  it("warning entry proceeds equal oversold shares times sale price", () => {
+    const trades = [
+      { date: "2024-01-02", symbol: "VTI", price: "200", quantity: "5", type: "buy" },
+      { date: "2024-06-01", symbol: "VTI", price: "250", quantity: "8", type: "sell" },
+    ];
+    const { realized } = computeGains(trades, MARKET);
+    const warning = realized.find((r) => r.warning);
+
+    // 3 oversold shares × $250 = $750
+    assert.ok(Math.abs(warning.proceeds - 750) < 0.01,
+      `Expected proceeds ~750, got ${warning.proceeds}`);
+    assert.ok(Math.abs(warning.shares - 3) < 0.01,
+      `Expected shares ~3, got ${warning.shares}`);
+  });
+
+  it("non-warning realized entries are correct despite oversell", () => {
+    const trades = [
+      { date: "2024-01-02", symbol: "VTI", price: "200", quantity: "5", type: "buy" },
+      { date: "2024-06-01", symbol: "VTI", price: "250", quantity: "8", type: "sell" },
+    ];
+    const { realized } = computeGains(trades, MARKET);
+    const normal = realized.filter((r) => !r.warning);
+
+    // The 5 legitimately-owned shares should produce a normal realized-gain entry
+    assert.ok(normal.length >= 1, "Expected at least one non-warning realized entry");
+    const total = normal.reduce((s, r) => s + r.shares, 0);
+    assert.ok(Math.abs(total - 5) < 0.01,
+      `Expected 5 shares in normal entries, got ${total}`);
+  });
+});
