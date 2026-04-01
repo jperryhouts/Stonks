@@ -405,7 +405,7 @@ main { line-height: 1.5; }
     color: #555;
 }
 
-#tools-chart-wrap {
+#allocation-chart-wrap {
     display: flex;
     justify-content: center;
     margin-bottom: 1rem;
@@ -823,7 +823,7 @@ body:not(.loading) #loading-spinner { display: none; }
 
 /* Analysis tab — return metrics */
 
-.analysis-header {
+.returns-header {
     margin-top: 2rem;
     display: flex;
     align-items: center;
@@ -831,7 +831,7 @@ body:not(.loading) #loading-spinner { display: none; }
     margin-bottom: 0.75rem;
 }
 
-.analysis-window-select {
+.returns-window-select {
     font-family: inherit;
     font-size: 0.875rem;
     padding: 0.25rem 0.5rem;
@@ -842,62 +842,62 @@ body:not(.loading) #loading-spinner { display: none; }
     color: #1a1a1a;
 }
 
-.analysis-metrics {
+.returns-metrics {
 }
 
-.analysis-metrics-table {
+.returns-metrics-table {
     border-collapse: collapse;
     margin-bottom: 0.25rem;
     width: max-content;
     font-size: 0.875rem;
 }
 
-.analysis-metrics-table th:last-child,
-.analysis-metrics-table td:last-child {
+.returns-metrics-table th:last-child,
+.returns-metrics-table td:last-child {
     width: 100%; /* spacer column — absorbs remaining space, content aligns left */
 }
 
-.analysis-metrics-table tr {
+.returns-metrics-table tr {
     border-bottom: 1px solid #f0f0f0;
 }
 
-.analysis-metrics-table tr:last-child {
+.returns-metrics-table tr:last-child {
     border-bottom: none;
 }
 
-.analysis-metrics-table th {
+.returns-metrics-table th {
     padding: 0.15rem 0;
     font-size: 0.8125rem;
     font-weight: 500;
     color: #666;
 }
 
-.analysis-metrics-table th:not(:first-child) {
+.returns-metrics-table th:not(:first-child) {
     text-align: right;
     padding-left: 1.5rem;
 }
 
-.analysis-metric-label {
+.returns-metric-label {
     padding: 0.4rem 0;
     color: #555;
     white-space: nowrap;
 }
 
-.analysis-metric-value {
+.returns-metric-value {
     padding: 0.4rem 0 0.4rem 1.5rem;
     text-align: right;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-.analysis-metric-caption {
+.returns-metric-caption {
     text-align: right;
     font-size: 0.75rem;
     color: #999;
 }
 
 /* Group-span header cells ("Annualized" / "Cumulative") */
-.analysis-metric-group-header {
+.returns-metric-group-header {
     text-align: center;
     color: #666;
     white-space: nowrap;
@@ -905,15 +905,15 @@ body:not(.loading) #loading-spinner { display: none; }
     font-weight: 500;
 }
 
-.analysis-metrics-table th.analysis-metric-group-header {
+.returns-metrics-table th.returns-metric-group-header {
     text-align: center;
 }
 
-.analysis-metrics-table thead tr:last-child th {
+.returns-metrics-table thead tr:last-child th {
     border-bottom: 1px solid #e0e0e0;
 }
 
-.analysis-metric-btn-col {
+.returns-metric-btn-col {
     width: 1.5rem;
     min-width: 1.5rem;
     padding-right: 0;
@@ -921,36 +921,36 @@ body:not(.loading) #loading-spinner { display: none; }
 }
 
 /* Sub-rows: individual symbol lines under Investments */
-.analysis-metrics-sub-row td {
+.returns-metrics-sub-row td {
     background: #fafafa;
     font-size: 0.85rem;
     border-bottom: 1px solid #f5f5f5;
 }
-.analysis-metrics-sub-row .analysis-metric-value {
+.returns-metrics-sub-row .returns-metric-value {
     font-size: 0.85rem;
     font-weight: 500;
 }
-.analysis-metric-sub-label {
+.returns-metric-sub-label {
     padding-left: 0.5rem;
     color: #777;
 }
 
 /* -------------------------------------------------------------------------
-   Tools tab — shared sub-tab bar
+   Shared sub-tab bar (Allocation, History, Settings tabs)
    ------------------------------------------------------------------------- */
 
-.tools-shared-section {
+.allocation-shared-section {
     margin-bottom: 1.5rem;
 }
 
-.tools-subtabs {
+.subtabs {
     display: flex;
     gap: 0;
     border-bottom: 1px solid #e0e0e0;
     margin-bottom: 1.5rem;
 }
 
-.tools-subtab {
+.subtab {
     font-family: inherit;
     font-size: 0.875rem;
     font-weight: 500;
@@ -964,9 +964,9 @@ body:not(.loading) #loading-spinner { display: none; }
     white-space: nowrap;
 }
 
-.tools-subtab:hover { color: #333; }
+.subtab:hover { color: #333; }
 
-.tools-subtab.active {
+.subtab.active {
     color: #1a1a1a;
     border-bottom-color: #555;
 }
@@ -1103,10 +1103,10 @@ body:not(.loading) #loading-spinner { display: none; }
 .hidden { display: none !important; } /* supersedes legacy .panel.hidden and .detail.hidden */
 
 /* -------------------------------------------------------------------------
-   Tools tab — shared targets section
+   Allocation tab — shared targets section
    ------------------------------------------------------------------------- */
 
-.tools-shared {
+.allocation-shared {
     margin-bottom: 1rem;
 }
 

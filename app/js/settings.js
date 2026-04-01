@@ -280,7 +280,7 @@
 
     // --- Sub-tab nav ---
     var subtabNav = document.createElement("div");
-    subtabNav.className = "tools-subtab-nav";
+    subtabNav.className = "subtab-nav";
 
     // --- Pane state ---
     var paneStates = {}; // key -> { loaded: bool, el, textarea, issuesBox, issuesList, successSpan }
@@ -292,7 +292,7 @@
     for (var si = 0; si < SUBTABS.length; si++) {
       (function (subtab) {
         var btn = document.createElement("button");
-        btn.className = "tools-subtab" + (subtab.key === "config" ? " active" : "");
+        btn.className = "subtab" + (subtab.key === "config" ? " active" : "");
         btn.setAttribute("data-settings-tab", subtab.key);
         btn.textContent = subtab.label;
         subtabNav.appendChild(btn);

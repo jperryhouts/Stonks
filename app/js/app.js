@@ -96,8 +96,8 @@ var localDateString = Portfolio.localDateString;
 var tableArrowNav = Portfolio.tableArrowNav;
 var historyDeltaStyle = Portfolio.historyDeltaStyle;
 
-// Tools — loaded from js/tools.js via Portfolio namespace
-var buildToolsPanel = Portfolio.buildToolsPanel;
+// Allocation — loaded from js/allocation.js via Portfolio namespace
+var buildAllocationPanel = Portfolio.buildAllocationPanel;
 
 // Settings — loaded from js/settings.js via Portfolio namespace
 var buildSettingsPanel = Portfolio.buildSettingsPanel;
@@ -654,19 +654,19 @@ function _histAttachEditHandler(td, date, sym, retirement, rebuildAll, currentVa
 }
 
 function buildHistoryTable(data, retirement, rebuildAll, trades, marketTickers) {
-  var container = document.getElementById("panel-table");
+  var container = document.getElementById("panel-history");
 
   // Sub-tab bar
   var subtabBar = document.createElement("div");
-  subtabBar.className = "tools-subtabs";
+  subtabBar.className = "subtabs";
   var balancesBtn = document.createElement("button");
-  balancesBtn.className = "tools-subtab active";
+  balancesBtn.className = "subtab active";
   balancesBtn.textContent = "Balances";
   var tradesBtn = document.createElement("button");
-  tradesBtn.className = "tools-subtab";
+  tradesBtn.className = "subtab";
   tradesBtn.textContent = "Trades";
   var contribBtn = document.createElement("button");
-  contribBtn.className = "tools-subtab";
+  contribBtn.className = "subtab";
   contribBtn.textContent = "Retirement Contributions";
   subtabBar.appendChild(balancesBtn);
   subtabBar.appendChild(tradesBtn);
@@ -1112,7 +1112,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
   var wLabel = document.createElement("span");
   wLabel.textContent = "Window:";
   var wSel = document.createElement("select");
-  wSel.className = "analysis-window-select";
+  wSel.className = "returns-window-select";
   var prevYearLabel = String(new Date().getFullYear() - 1);
   ["1M", "90D", "YTD", "PREV_YEAR", "1Y", "2Y", "All"].forEach(function (w) {
     var opt = document.createElement("option");
@@ -1208,7 +1208,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
 
       function makeMetricTd(val) {
         var td = document.createElement("td");
-        td.className = "analysis-metric-value";
+        td.className = "returns-metric-value";
         td.textContent = mfmt(val);
         if (val !== null && isFinite(val)) {
           td.style.color = val >= 0 ? "#16a34a" : "#dc2626";
@@ -1236,27 +1236,27 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
       perfSection.appendChild(perfTitle);
 
       var metricsEl = document.createElement("div");
-      metricsEl.className = "analysis-metrics wide-table-scroll";
+      metricsEl.className = "returns-metrics wide-table-scroll";
       var mtable = document.createElement("table");
-      mtable.className = "analysis-metrics-table";
+      mtable.className = "returns-metrics-table";
 
       var mthead = document.createElement("thead");
       var mhdr1 = document.createElement("tr");
       var mthBtn = document.createElement("th");
-      mthBtn.className = "analysis-metric-btn-col";
+      mthBtn.className = "returns-metric-btn-col";
       mthBtn.setAttribute("rowspan", "2");
       mhdr1.appendChild(mthBtn);
       var mthLabel = document.createElement("th");
-      mthLabel.className = "analysis-metric-label";
+      mthLabel.className = "returns-metric-label";
       mthLabel.setAttribute("rowspan", "2");
       mhdr1.appendChild(mthLabel);
       var mthAnn = document.createElement("th");
-      mthAnn.className = "analysis-metric-group-header";
+      mthAnn.className = "returns-metric-group-header";
       mthAnn.setAttribute("colspan", "2");
       mthAnn.textContent = "Annualized";
       mhdr1.appendChild(mthAnn);
       var mthCum = document.createElement("th");
-      mthCum.className = "analysis-metric-group-header";
+      mthCum.className = "returns-metric-group-header";
       mthCum.setAttribute("colspan", "2");
       var cumWinLabel = win === "PREV_YEAR" ? prevYearLabel : win === "All" ? "" : win;
       mthCum.textContent = cumWinLabel ? "Cumulative (" + cumWinLabel + ")" : "Cumulative";
@@ -1267,7 +1267,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
       var mhdr2 = document.createElement("tr");
       ["TWR", "XIRR", "TWR", "XIRR"].forEach(function(h) {
         var th = document.createElement("th");
-        th.className = "analysis-metric-value";
+        th.className = "returns-metric-value";
         th.textContent = h;
         mhdr2.appendChild(th);
       });
@@ -1283,7 +1283,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
 
         var tr = document.createElement("tr");
         var tdBtn = document.createElement("td");
-        tdBtn.className = "analysis-metric-btn-col";
+        tdBtn.className = "returns-metric-btn-col";
         var btn;
         if (isExpandable) {
           btn = document.createElement("button");
@@ -1294,7 +1294,7 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
         tr.appendChild(tdBtn);
 
         var tdLabel = document.createElement("td");
-        tdLabel.className = "analysis-metric-label";
+        tdLabel.className = "returns-metric-label";
         tdLabel.appendChild(document.createTextNode(group.name));
         tr.appendChild(tdLabel);
         tr.appendChild(makeMetricTd(result.twr));
@@ -1314,12 +1314,12 @@ function buildGainsPanel(gainsData, data, trades, retirement, assets) {
             var symResult = computeReturns(symSlice, symTrades, metricsCutoff, metricsLast);
 
             var subTr = document.createElement("tr");
-            subTr.className = "analysis-metrics-sub-row hidden";
+            subTr.className = "returns-metrics-sub-row hidden";
             var subBtnTd = document.createElement("td");
-            subBtnTd.className = "analysis-metric-btn-col";
+            subBtnTd.className = "returns-metric-btn-col";
             subTr.appendChild(subBtnTd);
             var subLabel = document.createElement("td");
-            subLabel.className = "analysis-metric-label analysis-metric-sub-label";
+            subLabel.className = "returns-metric-label returns-metric-sub-label";
             subLabel.textContent = sym;
             subTr.appendChild(subLabel);
             subTr.appendChild(makeMetricTd(symResult.twr));
@@ -2481,7 +2481,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   // Tab switching
   var tabs = document.querySelectorAll("#tabs .tab");
-  var panelNames = ["chart", "tools", "gains", "table", "settings"];
+  var panelNames = ["chart", "allocation", "gains", "history", "settings"];
   for (var ti = 0; ti < tabs.length; ti++) {
     tabs[ti].addEventListener("click", function () {
       var target = this.getAttribute("data-tab");
@@ -2526,13 +2526,13 @@ document.addEventListener("DOMContentLoaded", async function () {
         drawChart(chartRef, state.data, null);
         updateTitle();
         updateDetail(state.data, state.data.chartData.length - 1);
-        document.getElementById("panel-table").innerHTML = "";
+        document.getElementById("panel-history").innerHTML = "";
         var tickers = market.length > 0
           ? Object.keys(market[0]).filter(function (k) { return k !== "timestamp"; })
           : [];
         buildHistoryTable(fullData, retirement, rebuildAll, trades, tickers);
         buildGainsPanel(gainsData, fullData, trades, retirement, assets);
-        buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG, EXPOSURE_DISPLAY);
+        buildAllocationPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG, EXPOSURE_DISPLAY);
         buildSettingsPanel(document.getElementById("panel-settings"), reloadAllData);
         showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
       });
@@ -2564,7 +2564,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   buildHistoryTable(fullData, retirement, rebuildAll, trades, marketTickers);
   buildGainsPanel(gainsData, fullData, trades, retirement, assets);
-  buildToolsPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG, EXPOSURE_DISPLAY);
+  buildAllocationPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG, EXPOSURE_DISPLAY);
   buildSettingsPanel(document.getElementById("panel-settings"), reloadAllData);
   showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
 

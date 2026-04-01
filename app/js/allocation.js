@@ -409,8 +409,8 @@
   // DOM builder
   // ---------------------------------------------------------------------------
 
-  function buildToolsPanel(fullData, exposureMap, rebalancingConfig, exposureDisplay) {
-    var container = document.getElementById("panel-tools");
+  function buildAllocationPanel(fullData, exposureMap, rebalancingConfig, exposureDisplay) {
+    var container = document.getElementById("panel-allocation");
     if (!container) return;
     container.innerHTML = "";
 
@@ -455,11 +455,11 @@
 
     // --- Shared section: donut chart + category table ---
     var sharedSection = document.createElement("div");
-    sharedSection.className = "tools-shared-section";
+    sharedSection.className = "allocation-shared-section";
 
     if (exp && exp.total > 0) {
       var chartWrap = document.createElement("div");
-      chartWrap.id = "tools-chart-wrap";
+      chartWrap.id = "allocation-chart-wrap";
       drawExposureChart(chartWrap, chartRows, barColors, exp.total, onHighlightRebal);
       sharedSection.appendChild(chartWrap);
     }
@@ -470,18 +470,18 @@
 
     // --- Sub-tab bar ---
     var subtabBar = document.createElement("div");
-    subtabBar.className = "tools-subtabs";
+    subtabBar.className = "subtabs";
 
     var rebalBtn = document.createElement("button");
-    rebalBtn.className = "tools-subtab active";
+    rebalBtn.className = "subtab active";
     rebalBtn.textContent = "Rebalance";
 
     var investBtn = document.createElement("button");
-    investBtn.className = "tools-subtab";
+    investBtn.className = "subtab";
     investBtn.textContent = "Invest";
 
     var withdrawBtn = document.createElement("button");
-    withdrawBtn.className = "tools-subtab";
+    withdrawBtn.className = "subtab";
     withdrawBtn.textContent = "Withdraw";
 
     subtabBar.appendChild(rebalBtn);
@@ -871,6 +871,6 @@
 
   exports.computeRebalancing = computeRebalancing;
   exports.computeContributions = computeContributions;
-  exports.buildToolsPanel = buildToolsPanel;
+  exports.buildAllocationPanel = buildAllocationPanel;
 
 })(typeof module !== "undefined" ? module.exports : (window.Portfolio = window.Portfolio || {}));

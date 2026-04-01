@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { computeRebalancing, computeContributions } = require("../app/js/tools.js");
+const { computeRebalancing, computeContributions } = require("../app/js/allocation.js");
 
 // ---------------------------------------------------------------------------
 // Test helpers
