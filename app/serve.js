@@ -7,6 +7,7 @@ const http = require("http");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 
 const PORT = parseInt(process.argv[2] || "8000", 10);
 const APP_DIR = __dirname;                           // app/
@@ -60,6 +61,9 @@ const APP_SKIP = new Set(["build.js", "serve.js"]);
 
 // Allowlisted filenames for /data/ and /config/ routes.
 const DATA_ALLOW = new Set(["market.json", "trades.json", "retirement.json", "assets.json", "config.json"]);
+
+// 1×1 transparent GIF — served inline for /favicon.ico to avoid filesystem lookup.
+const FAVICON = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
 
 /** Split a single CSV line respecting RFC 4180 double-quote escaping. */
 function parseCsvLine(line) {
@@ -132,6 +136,84 @@ function prettyJson(val, indent) {
     return JSON.stringify(val);
 }
 
+// In-memory cache: filePath → { mtime: number, data: Buffer|string, gz: Buffer|null }
+const fileCache = new Map();
+
+// Ordered list of JS files that form the client bundle (must match <script> execution order).
+const JS_FILES = [
+    "js/config.js", "js/fmt.js", "js/data.js", "js/retirement.js",
+    "js/assets.js", "js/gains.js", "js/returns.js", "js/validate.js",
+    "js/ui-utils.js", "js/allocation.js", "js/settings.js", "js/app.js",
+];
+
+// Bundle cache: rebuilt whenever any constituent file's mtime changes.
+let bundleCache = null; // { key: string, mtime: number, etag: string, data: Buffer, gz: Buffer|null }
+
+function getBundle() {
+    const paths = JS_FILES.map(f => path.join(APP_DIR, f));
+    const mtimes = paths.map(p => fs.statSync(p).mtimeMs);
+    const key = mtimes.join(",");
+    if (bundleCache && bundleCache.key === key) return bundleCache;
+    const nl = Buffer.from("\n");
+    const buffers = [];
+    for (const p of paths) {
+        if (buffers.length > 0) buffers.push(nl);
+        buffers.push(fs.readFileSync(p));
+    }
+    const data = Buffer.concat(buffers);
+    const gz = data.length >= 1024 ? zlib.gzipSync(data) : null;
+    bundleCache = { key, mtime: Math.max(...mtimes), etag: '"' + key + '"', data, gz };
+    return bundleCache;
+}
+
+
+/**
+ * Return a cache entry { mtime, data, gz } for filePath.
+ * Reads from disk and (re-)compresses only when mtime has changed.
+ * Throws on ENOENT or other errors.
+ */
+function getCachedFile(filePath) {
+    const stat = fs.statSync(filePath);
+    const mtime = stat.mtimeMs;
+    const cached = fileCache.get(filePath);
+    if (cached && cached.mtime === mtime) return cached;
+    const data = fs.readFileSync(filePath);
+    const gz = data.length >= 1024 ? zlib.gzipSync(data) : null;
+    const entry = { mtime, data, gz };
+    fileCache.set(filePath, entry);
+    return entry;
+}
+
+/**
+ * Write a successful cached response, serving gzip when the client accepts it
+ * and a compressed buffer exists. extraHeaders is merged into the response.
+ * Sends 304 Not Modified when the client's If-None-Match matches the entry mtime.
+ */
+function sendCached(res, contentType, entry, req, extraHeaders) {
+    extraHeaders = extraHeaders || {};
+    const etag = entry.etag || ('"' + entry.mtime + '"');
+    if (req.headers["if-none-match"] === etag) {
+        res.writeHead(304, { ...SEC_HEADERS, ...extraHeaders, "etag": etag });
+        res.end();
+        return;
+    }
+    const acceptsGzip = (req.headers["accept-encoding"] || "").includes("gzip");
+    if (acceptsGzip && entry.gz) {
+        res.writeHead(200, {
+            ...SEC_HEADERS, ...extraHeaders,
+            "content-type": contentType,
+            "content-encoding": "gzip",
+            "vary": "Accept-Encoding",
+            "etag": etag,
+        });
+        res.end(entry.gz);
+    } else {
+        const varyHeaders = entry.gz ? { "vary": "Accept-Encoding" } : {};
+        res.writeHead(200, { ...SEC_HEADERS, ...extraHeaders, ...varyHeaders, "content-type": contentType, "etag": etag });
+        res.end(entry.data);
+    }
+}
+
 const MAX_BODY = 1 * 1024 * 1024; // 1 MB
 
 /** Read JSON request body, rejecting payloads larger than MAX_BODY. */
@@ -190,16 +272,18 @@ function safeEqual(a, b) {
 }
 
 /** Verify a password against the stored AUTH_PASS (hashed or plaintext). */
-function verifyPassword(candidate) {
+async function verifyPassword(candidate) {
     if (AUTH_PASS_HASH) {
-        const derived = crypto.scryptSync(candidate, AUTH_PASS_SALT, SCRYPT_KEYLEN, SCRYPT_OPTS);
+        const derived = await new Promise((resolve, reject) =>
+            crypto.scrypt(candidate, AUTH_PASS_SALT, SCRYPT_KEYLEN, SCRYPT_OPTS, (err, key) =>
+                err ? reject(err) : resolve(key)));
         return crypto.timingSafeEqual(derived, AUTH_PASS_HASH);
     }
     return safeEqual(candidate, AUTH_PASS);
 }
 
 /** Check Basic Auth credentials. Returns true if valid or auth is disabled. */
-function checkAuth(req, res, ip) {
+async function checkAuth(req, res, ip) {
     if (!AUTH_ENABLED) return true;
     const header = req.headers.authorization || "";
     if (!header.startsWith("Basic ")) {
@@ -216,7 +300,7 @@ function checkAuth(req, res, ip) {
         return false;
     }
     const pass = decoded.slice(colon + 1);
-    if (!verifyPassword(pass)) {
+    if (!await verifyPassword(pass)) {
         serverWarn(ip, AUTH_LOG_PASSWORDS ? `bad password: "${pass}"` : "authentication failed");
         res.writeHead(401, { ...SEC_HEADERS, "WWW-Authenticate": 'Basic realm="Portfolio"' });
         res.end("Unauthorized");
@@ -458,7 +542,7 @@ function validateRetirement(body) {
 
 const server = http.createServer(async (req, res) => {
     const ip = getIP(req);
-    if (!checkAuth(req, res, ip)) return;
+    if (!await checkAuth(req, res, ip)) return;
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     let pathname = decodeURIComponent(url.pathname);
@@ -492,7 +576,14 @@ const server = http.createServer(async (req, res) => {
             // Normalize values
             const clean = normalizeTrades(body);
             // Write JSON directly — no rebuild needed
-            writeFileAtomic(path.join(DATA_DIR, "trades.json"), prettyJson(clean));
+            const tradesPath = path.join(DATA_DIR, "trades.json");
+            const tradesContent = prettyJson(clean);
+            writeFileAtomic(tradesPath, tradesContent);
+            try {
+                const written = Buffer.from(tradesContent);
+                const gz = written.length >= 1024 ? zlib.gzipSync(written) : null;
+                fileCache.set(tradesPath, { mtime: fs.statSync(tradesPath).mtimeMs, data: written, gz });
+            } catch (_) {}
             res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true, rows: clean.length }));
         } catch (e) {
@@ -515,7 +606,14 @@ const server = http.createServer(async (req, res) => {
                 return;
             }
             const clean = normalizeRetirement(body);
-            writeFileAtomic(path.join(DATA_DIR, "retirement.json"), prettyJson(clean));
+            const retirementPath = path.join(DATA_DIR, "retirement.json");
+            const retirementContent = prettyJson(clean);
+            writeFileAtomic(retirementPath, retirementContent);
+            try {
+                const written = Buffer.from(retirementContent);
+                const gz = written.length >= 1024 ? zlib.gzipSync(written) : null;
+                fileCache.set(retirementPath, { mtime: fs.statSync(retirementPath).mtimeMs, data: written, gz });
+            } catch (_) {}
             res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true, values: clean.values.length }));
         } catch (e) {
@@ -549,7 +647,13 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: configErr }));
                 return;
             }
-            writeFileAtomic(path.join(DATA_DIR, "config.json"), body.content);
+            const configPath = path.join(DATA_DIR, "config.json");
+            writeFileAtomic(configPath, body.content);
+            try {
+                const written = Buffer.from(body.content);
+                const gz = written.length >= 1024 ? zlib.gzipSync(written) : null;
+                fileCache.set(configPath, { mtime: fs.statSync(configPath).mtimeMs, data: written, gz });
+            } catch (_) {}
             serverLog(ip, "config saved");
             res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true }));
@@ -584,7 +688,13 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: assetsErr }));
                 return;
             }
-            writeFileAtomic(path.join(DATA_DIR, "assets.json"), body.content);
+            const assetsPath = path.join(DATA_DIR, "assets.json");
+            writeFileAtomic(assetsPath, body.content);
+            try {
+                const written = Buffer.from(body.content);
+                const gz = written.length >= 1024 ? zlib.gzipSync(written) : null;
+                fileCache.set(assetsPath, { mtime: fs.statSync(assetsPath).mtimeMs, data: written, gz });
+            } catch (_) {}
             serverLog(ip, "assets saved");
             res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true }));
@@ -594,6 +704,13 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(status, { ...SEC_HEADERS, "Content-Type": "application/json" });
             res.end(JSON.stringify({ error: status === 413 ? "Request body too large" : "Internal server error" }));
         }
+        return;
+    }
+
+    // --- Favicon ---
+    if (pathname === "/favicon.ico") {
+        res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "image/gif", "Cache-Control": "max-age=86400" });
+        res.end(FAVICON);
         return;
     }
 
@@ -612,10 +729,21 @@ const server = http.createServer(async (req, res) => {
         }
         if (name === "market.json") {
             try {
-                const csv = fs.readFileSync(path.join(DATA_DIR, "market.csv"), "utf-8");
-                const json = JSON.stringify(csvToJson(csv));
-                res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
-                res.end(json);
+                const csvPath = path.join(DATA_DIR, "market.csv");
+                const stat = fs.statSync(csvPath);
+                const mtime = stat.mtimeMs;
+                const cached = fileCache.get(csvPath);
+                let entry;
+                if (cached && cached.mtime === mtime) {
+                    entry = cached;
+                } else {
+                    const csv = fs.readFileSync(csvPath, "utf-8");
+                    const data = JSON.stringify(csvToJson(csv));
+                    const gz = Buffer.byteLength(data) >= 1024 ? zlib.gzipSync(data) : null;
+                    entry = { mtime, data, gz };
+                    fileCache.set(csvPath, entry);
+                }
+                sendCached(res, "application/json", entry, req);
             } catch (e) {
                 if (e.code === "ENOENT") {
                     res.writeHead(404, SEC_HEADERS);
@@ -628,11 +756,26 @@ const server = http.createServer(async (req, res) => {
             }
             return;
         }
-        fs.readFile(path.join(DATA_DIR, name), (err, data) => {
-            if (err) { res.writeHead(404, SEC_HEADERS); res.end("Not found"); return; }
-            res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
-            res.end(data);
-        });
+        try {
+            const entry = getCachedFile(path.join(DATA_DIR, name));
+            sendCached(res, "application/json", entry, req);
+        } catch (e) {
+            res.writeHead(404, SEC_HEADERS);
+            res.end("Not found");
+        }
+        return;
+    }
+
+    // --- JS Bundle ---
+    if (pathname === "/js/app-bundle.js") {
+        try {
+            const entry = getBundle();
+            sendCached(res, "text/javascript", entry, req);
+        } catch (e) {
+            console.error("GET /js/app-bundle.js error:", e);
+            res.writeHead(500, SEC_HEADERS);
+            res.end("Internal server error");
+        }
         return;
     }
 
@@ -648,16 +791,23 @@ const server = http.createServer(async (req, res) => {
         res.end("Not found");
         return;
     }
-    fs.readFile(filePath, (err, data) => {
-        if (err) {
-            res.writeHead(404, SEC_HEADERS);
-            res.end("Not found");
-            return;
+    fs.stat(filePath, (err, stat) => {
+        if (err) { res.writeHead(404, SEC_HEADERS); res.end("Not found"); return; }
+        const mtime = stat.mtimeMs;
+        const cached = fileCache.get(filePath);
+        let entry;
+        if (cached && cached.mtime === mtime) {
+            entry = cached;
+        } else {
+            let data;
+            try { data = fs.readFileSync(filePath); } catch (_) { res.writeHead(404, SEC_HEADERS); res.end("Not found"); return; }
+            const gz = data.length >= 1024 ? zlib.gzipSync(data) : null;
+            entry = { mtime, data, gz };
+            fileCache.set(filePath, entry);
         }
         const ext = path.extname(filePath).toLowerCase();
         const extra = pathname === "/index.html" ? { "Cache-Control": "no-store" } : {};
-        res.writeHead(200, { ...SEC_HEADERS, ...extra, "Content-Type": MIME[ext] || "application/octet-stream" });
-        res.end(data);
+        sendCached(res, MIME[ext] || "application/octet-stream", entry, req, extra);
     });
 });
 
@@ -680,4 +830,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, validateConfig, validateAssets, getIP, serverLog, serverWarn, server };
+module.exports = { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, validateConfig, validateAssets, getIP, serverLog, serverWarn, sendCached, server };

@@ -1,4 +1,4 @@
-.PHONY: fetch serve stop hash-password test test-python
+.PHONY: fetch serve stop hash-password test test-python test-js
 
 DATA_DIR ?= ./demo-data
 
@@ -14,8 +14,10 @@ stop:
 test-python:
 	python3 -m unittest discover -s tests/ -p "test_*.py" -v
 
-test: test-python
+test-js:
 	node --test tests/
+
+test: test-python test-js
 
 hash-password:
 	@node utils/hash_password.js $(PASSWORD)

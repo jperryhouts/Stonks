@@ -22,6 +22,26 @@ const { server } = require("../app/serve.js");
 
 let PORT;
 
+/** GET from the test server; resolves with {status, body, headers}. */
+function get(urlPath, reqHeaders) {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      { host: "127.0.0.1", port: PORT, path: urlPath, method: "GET", headers: reqHeaders || {} },
+      (res) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => {
+          const buf = Buffer.concat(chunks).toString();
+          try { resolve({ status: res.statusCode, body: JSON.parse(buf), headers: res.headers }); }
+          catch { resolve({ status: res.statusCode, body: buf, headers: res.headers }); }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 /** POST JSON to the test server; resolves with {status, body}. */
 function post(urlPath, payload) {
   return new Promise((resolve, reject) => {
@@ -221,3 +241,46 @@ describe("POST /api/assets", () => {
     assert.equal(r.status, 400);
   });
 });
+
+// ---------------------------------------------------------------------------
+// GET /js/app-bundle.js
+// ---------------------------------------------------------------------------
+
+describe("GET /js/app-bundle.js", () => {
+  it("returns 200 with content-type text/javascript", async () => {
+    const r = await get("/js/app-bundle.js");
+    assert.equal(r.status, 200);
+    assert.ok(r.headers["content-type"].startsWith("text/javascript"));
+  });
+
+  it("concatenates JS files in the declared order", async () => {
+    // config.js (first) defines parseConfig; app.js (last) registers DOMContentLoaded.
+    // If the order were wrong the app would silently break at runtime.
+    const r = await get("/js/app-bundle.js");
+    const body = r.body; // plain text when JSON.parse fails
+    const posFirst = body.indexOf("parseConfig");
+    const posLast  = body.indexOf("DOMContentLoaded");
+    assert.ok(posFirst !== -1, "bundle should contain content from config.js");
+    assert.ok(posLast  !== -1, "bundle should contain content from app.js");
+    assert.ok(posFirst < posLast, "config.js content must precede app.js content");
+  });
+
+  it("includes an etag header", async () => {
+    const r = await get("/js/app-bundle.js");
+    assert.ok(r.headers["etag"], "etag header should be present");
+  });
+
+  it("returns 304 when If-None-Match matches the etag", async () => {
+    const first = await get("/js/app-bundle.js");
+    const etag = first.headers["etag"];
+    const second = await get("/js/app-bundle.js", { "if-none-match": etag });
+    assert.equal(second.status, 304);
+    assert.equal(second.body, "");
+  });
+
+  it("returns 200 when If-None-Match is stale", async () => {
+    const r = await get("/js/app-bundle.js", { "if-none-match": '"stale-etag"' });
+    assert.equal(r.status, 200);
+  });
+});
+

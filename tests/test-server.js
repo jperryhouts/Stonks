@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, getIP, serverLog, serverWarn } = require("../app/serve.js");
+const { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, getIP, serverLog, serverWarn, sendCached } = require("../app/serve.js");
 
 // ---------------------------------------------------------------------------
 // csvToJson
@@ -591,5 +591,120 @@ describe("normalizeRetirement", () => {
     const body = { accounts: [], values: [] };
     const { contributions } = normalizeRetirement(body);
     assert.deepEqual(contributions, []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sendCached
+// ---------------------------------------------------------------------------
+
+describe("sendCached", () => {
+  function makeRes() {
+    const headers = {};
+    let statusCode = null;
+    let body = null;
+    return {
+      writeHead(code, hdrs) { statusCode = code; Object.assign(headers, hdrs); },
+      end(data) { body = data; },
+      _statusCode() { return statusCode; },
+      _headers() { return headers; },
+      _body() { return body; },
+    };
+  }
+
+  it("serves raw data when Accept-Encoding does not include gzip", () => {
+    const res = makeRes();
+    const req = { headers: { "accept-encoding": "identity" } };
+    const data = Buffer.from("hello");
+    const gz = Buffer.from("fake-gz");
+    sendCached(res, "application/json", { data, gz }, req, {});
+    assert.equal(res._statusCode(), 200);
+    assert.equal(res._headers()["content-encoding"], undefined);
+    assert.deepEqual(res._body(), data);
+  });
+
+  it("serves gzip when Accept-Encoding includes gzip and gz is non-null", () => {
+    const res = makeRes();
+    const req = { headers: { "accept-encoding": "gzip, deflate" } };
+    const data = Buffer.from("hello");
+    const gz = Buffer.from("fake-gz");
+    sendCached(res, "application/json", { data, gz }, req, {});
+    assert.equal(res._statusCode(), 200);
+    assert.equal(res._headers()["content-encoding"], "gzip");
+    assert.equal(res._headers()["vary"], "Accept-Encoding");
+    assert.deepEqual(res._body(), gz);
+  });
+
+  it("falls back to raw data when gz is null even if gzip accepted", () => {
+    const res = makeRes();
+    const req = { headers: { "accept-encoding": "gzip" } };
+    const data = Buffer.from("hi");
+    sendCached(res, "text/plain", { data, gz: null }, req, {});
+    assert.equal(res._headers()["content-encoding"], undefined);
+    assert.deepEqual(res._body(), data);
+  });
+
+  it("serves raw data when accept-encoding header is absent", () => {
+    const res = makeRes();
+    const req = { headers: {} };
+    const data = Buffer.from("hello");
+    const gz = Buffer.from("fake-gz");
+    sendCached(res, "application/json", { data, gz }, req, {});
+    assert.equal(res._headers()["content-encoding"], undefined);
+    assert.deepEqual(res._body(), data);
+  });
+
+  it("merges extra headers into response", () => {
+    const res = makeRes();
+    const req = { headers: {} };
+    const data = Buffer.from("x");
+    sendCached(res, "text/html", { data, gz: null }, req, { "cache-control": "no-store" });
+    assert.equal(res._headers()["cache-control"], "no-store");
+  });
+
+  it("includes etag header derived from entry.mtime on 200", () => {
+    const res = makeRes();
+    const req = { headers: {} };
+    sendCached(res, "text/plain", { mtime: 12345, data: Buffer.from("x"), gz: null }, req);
+    assert.equal(res._statusCode(), 200);
+    assert.equal(res._headers()["etag"], '"12345"');
+  });
+
+  it("uses entry.etag over entry.mtime when both are present", () => {
+    const res = makeRes();
+    const req = { headers: {} };
+    sendCached(res, "text/plain", { mtime: 12345, etag: '"abc,def"', data: Buffer.from("x"), gz: null }, req);
+    assert.equal(res._headers()["etag"], '"abc,def"');
+  });
+
+  it("returns 304 with etag when If-None-Match matches entry.mtime etag", () => {
+    const res = makeRes();
+    const req = { headers: { "if-none-match": '"12345"' } };
+    sendCached(res, "text/plain", { mtime: 12345, data: Buffer.from("x"), gz: null }, req);
+    assert.equal(res._statusCode(), 304);
+    assert.equal(res._headers()["etag"], '"12345"');
+  });
+
+  it("returns 304 with etag when If-None-Match matches entry.etag", () => {
+    const res = makeRes();
+    const req = { headers: { "if-none-match": '"abc,def"' } };
+    sendCached(res, "text/plain", { mtime: 12345, etag: '"abc,def"', data: Buffer.from("x"), gz: null }, req);
+    assert.equal(res._statusCode(), 304);
+    assert.equal(res._headers()["etag"], '"abc,def"');
+  });
+
+  it("304 response has empty body", () => {
+    const res = makeRes();
+    const req = { headers: { "if-none-match": '"99"' } };
+    sendCached(res, "text/plain", { mtime: 99, data: Buffer.from("hello"), gz: null }, req);
+    assert.equal(res._statusCode(), 304);
+    assert.equal(res._body(), undefined);
+  });
+
+  it("returns 200 when If-None-Match does not match", () => {
+    const res = makeRes();
+    const req = { headers: { "if-none-match": '"stale"' } };
+    sendCached(res, "text/plain", { mtime: 99, data: Buffer.from("hello"), gz: null }, req);
+    assert.equal(res._statusCode(), 200);
   });
 });

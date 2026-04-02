@@ -6,14 +6,13 @@
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
   ];
 
+  var _dollarFmt = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
   function fmtDollar(n) {
-    return (
-      "$" +
-      n.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-    );
+    return "$" + _dollarFmt.format(n);
   }
 
   function fmtShort(n) {
@@ -34,12 +33,15 @@
     );
   }
 
+  var _sharesIntFmt = new Intl.NumberFormat("en-US");
+  var _sharesFmt = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  });
+
   function fmtShares(n) {
-    if (n === Math.floor(n)) return n.toLocaleString("en-US");
-    return n.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 4,
-    });
+    if (n === Math.floor(n)) return _sharesIntFmt.format(n);
+    return _sharesFmt.format(n);
   }
 
   exports.MONTHS = MONTHS;

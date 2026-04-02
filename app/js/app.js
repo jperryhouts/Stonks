@@ -769,115 +769,138 @@ function buildHistoryTable(data, retirement, rebuildAll, trades, marketTickers) 
   thead.appendChild(headerRow);
   table.appendChild(thead);
 
-  // Body — most recent first
+  // Body — built incrementally via requestIdleCallback so the main thread
+  // stays responsive (chart hover etc.) while the history table fills in.
   var tbody = document.createElement("tbody");
-  for (var j = cd.length - 1; j >= 0; j--) {
-    var pt = cd[j];
-    var prev = j > 0 ? cd[j - 1] : null;
-    var tr = document.createElement("tr");
+  var j = cd.length - 1;
 
-    var rowDate = pt.date.slice(0, 10);
-    var tdDate = document.createElement("td");
-    tdDate.textContent = rowDate;
-    tr.appendChild(tdDate);
+  // requestIdleCallback shimmed for environments that lack it (old Safari).
+  var _rIC = window.requestIdleCallback || function (cb) {
+    setTimeout(function () { cb({ timeRemaining: function () { return 50; } }); }, 0);
+  };
 
-    for (var k = 0; k < activeSymbols.length; k++) {
-      var sym = activeSymbols[k];
-      var val = pt.values[sym] || 0;
-      var td = document.createElement("td");
-      if (retirementSet[sym] && !acctHasAnyValues[sym]) {
-        td.textContent = "—";
-        td.style.color = "#9ca3af";
-        td.title = "No ground-truth values recorded yet — double-click to add one";
-      } else {
-        td.textContent = fmtDollar(val);
-        if (retirementSet[sym] && gtSet[rowDate + ":" + sym]) {
-          td.style.fontWeight = "bold";
-        }
-        if (prev !== null) {
-          var prevVal = prev.values[sym] || 0;
-          historyColorCell(td, val, prevVal);
-        }
-      }
-      if (retirementSet[sym] && retirement) {
-        _histAttachEditHandler(td, rowDate, sym, retirement, rebuildAll, val);
-      }
-      tr.appendChild(td);
-    }
+  function _finalize() {
+    table.appendChild(tbody);
+    balancesPanel.appendChild(table);
 
-    if (hasZeroCols) {
-      var tdPlaceholder = document.createElement("td");
-      tdPlaceholder.className = "history-expand-col";
-      tr.appendChild(tdPlaceholder);
+    // Sub-tab switching
+    balancesBtn.addEventListener("click", function () {
+      balancesBtn.classList.add("active");
+      tradesBtn.classList.remove("active");
+      contribBtn.classList.remove("active");
+      balancesPanel.classList.remove("hidden");
+      tradesSubPanel.classList.add("hidden");
+      contribSubPanel.classList.add("hidden");
+    });
+    tradesBtn.addEventListener("click", function () {
+      tradesBtn.classList.add("active");
+      balancesBtn.classList.remove("active");
+      contribBtn.classList.remove("active");
+      tradesSubPanel.classList.remove("hidden");
+      balancesPanel.classList.add("hidden");
+      contribSubPanel.classList.add("hidden");
+    });
+    contribBtn.addEventListener("click", function () {
+      contribBtn.classList.add("active");
+      balancesBtn.classList.remove("active");
+      tradesBtn.classList.remove("active");
+      contribSubPanel.classList.remove("hidden");
+      balancesPanel.classList.add("hidden");
+      tradesSubPanel.classList.add("hidden");
+    });
 
-      for (var m = 0; m < zeroSymbols.length; m++) {
-        var symZ = zeroSymbols[m];
-        var valZ = pt.values[symZ] || 0;
-        var tdZ = document.createElement("td");
-        tdZ.className = "zero-col";
-        if (retirementSet[symZ] && !acctHasAnyValues[symZ]) {
-          tdZ.textContent = "—";
-          tdZ.style.color = "#9ca3af";
-          tdZ.title = "No ground-truth values recorded yet — double-click to add one";
+    // Populate trades and contributions sub-tabs
+    buildTradesPanel(trades, marketTickers, rebuildAll);
+    buildContributionsPanel(retirement, rebuildAll);
+
+    console.log("App fully loaded in " + (performance.now() / 1000).toFixed(2) + "s");
+  }
+
+  function _buildChunk(deadline) {
+    while (j >= 0 && deadline.timeRemaining() > 2) {
+      var pt = cd[j];
+      var prev = j > 0 ? cd[j - 1] : null;
+      var tr = document.createElement("tr");
+
+      var rowDate = pt.date.slice(0, 10);
+      var tdDate = document.createElement("td");
+      tdDate.textContent = rowDate;
+      tr.appendChild(tdDate);
+
+      for (var k = 0; k < activeSymbols.length; k++) {
+        var sym = activeSymbols[k];
+        var val = pt.values[sym] || 0;
+        var td = document.createElement("td");
+        if (retirementSet[sym] && !acctHasAnyValues[sym]) {
+          td.textContent = "—";
+          td.style.color = "#9ca3af";
+          td.title = "No ground-truth values recorded yet — double-click to add one";
         } else {
-          tdZ.textContent = fmtDollar(valZ);
-          if (retirementSet[symZ] && gtSet[rowDate + ":" + symZ]) {
-            tdZ.style.fontWeight = "bold";
+          td.textContent = fmtDollar(val);
+          if (retirementSet[sym] && gtSet[rowDate + ":" + sym]) {
+            td.style.fontWeight = "bold";
           }
           if (prev !== null) {
-            var prevValZ = prev.values[symZ] || 0;
-            historyColorCell(tdZ, valZ, prevValZ);
+            var prevVal = prev.values[sym] || 0;
+            historyColorCell(td, val, prevVal);
           }
         }
-        if (retirementSet[symZ] && retirement) {
-          _histAttachEditHandler(tdZ, rowDate, symZ, retirement, rebuildAll, valZ);
+        if (retirementSet[sym] && retirement) {
+          _histAttachEditHandler(td, rowDate, sym, retirement, rebuildAll, val);
         }
-        tr.appendChild(tdZ);
+        tr.appendChild(td);
       }
+
+      if (hasZeroCols) {
+        var tdPlaceholder = document.createElement("td");
+        tdPlaceholder.className = "history-expand-col";
+        tr.appendChild(tdPlaceholder);
+
+        for (var m = 0; m < zeroSymbols.length; m++) {
+          var symZ = zeroSymbols[m];
+          var valZ = pt.values[symZ] || 0;
+          var tdZ = document.createElement("td");
+          tdZ.className = "zero-col";
+          if (retirementSet[symZ] && !acctHasAnyValues[symZ]) {
+            tdZ.textContent = "—";
+            tdZ.style.color = "#9ca3af";
+            tdZ.title = "No ground-truth values recorded yet — double-click to add one";
+          } else {
+            tdZ.textContent = fmtDollar(valZ);
+            if (retirementSet[symZ] && gtSet[rowDate + ":" + symZ]) {
+              tdZ.style.fontWeight = "bold";
+            }
+            if (prev !== null) {
+              var prevValZ = prev.values[symZ] || 0;
+              historyColorCell(tdZ, valZ, prevValZ);
+            }
+          }
+          if (retirementSet[symZ] && retirement) {
+            _histAttachEditHandler(tdZ, rowDate, symZ, retirement, rebuildAll, valZ);
+          }
+          tr.appendChild(tdZ);
+        }
+      }
+
+      var tdTotal = document.createElement("td");
+      tdTotal.textContent = fmtDollar(pt.total);
+      if (prev !== null) {
+        historyColorCell(tdTotal, pt.total, prev.total);
+      }
+      tr.appendChild(tdTotal);
+
+      tbody.appendChild(tr);
+      j--;
     }
 
-    var tdTotal = document.createElement("td");
-    tdTotal.textContent = fmtDollar(pt.total);
-    if (prev !== null) {
-      historyColorCell(tdTotal, pt.total, prev.total);
+    if (j >= 0) {
+      _rIC(_buildChunk, { timeout: 500 });
+    } else {
+      _finalize();
     }
-    tr.appendChild(tdTotal);
-
-    tbody.appendChild(tr);
   }
-  table.appendChild(tbody);
 
-  balancesPanel.appendChild(table);
-
-  // Sub-tab switching
-  balancesBtn.addEventListener("click", function () {
-    balancesBtn.classList.add("active");
-    tradesBtn.classList.remove("active");
-    contribBtn.classList.remove("active");
-    balancesPanel.classList.remove("hidden");
-    tradesSubPanel.classList.add("hidden");
-    contribSubPanel.classList.add("hidden");
-  });
-  tradesBtn.addEventListener("click", function () {
-    tradesBtn.classList.add("active");
-    balancesBtn.classList.remove("active");
-    contribBtn.classList.remove("active");
-    tradesSubPanel.classList.remove("hidden");
-    balancesPanel.classList.add("hidden");
-    contribSubPanel.classList.add("hidden");
-  });
-  contribBtn.addEventListener("click", function () {
-    contribBtn.classList.add("active");
-    balancesBtn.classList.remove("active");
-    tradesBtn.classList.remove("active");
-    contribSubPanel.classList.remove("hidden");
-    balancesPanel.classList.add("hidden");
-    tradesSubPanel.classList.add("hidden");
-  });
-
-  // Populate trades and contributions sub-tabs
-  buildTradesPanel(trades, marketTickers, rebuildAll);
-  buildContributionsPanel(retirement, rebuildAll);
+  _rIC(_buildChunk, { timeout: 500 });
 }
 
 // Apply a red→white→green background and a delta tooltip to a history cell.
@@ -2427,25 +2450,31 @@ function showBanner(items) {
 // ---------------------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", async function () {
-  await loadConfig();
   var trades, market, retirement, assets;
   try {
     var results = await Promise.all([
+      loadConfig(),
       fetchJSON("data/trades.json"),
       fetchJSON("data/market.json"),
       fetchJSON("data/retirement.json").catch(function () { return null; }),
       fetchJSON("data/assets.json").catch(function () { return null; }),
     ]);
-    trades = results[0];
-    market = results[1];
-    retirement = results[2];
-    assets = results[3];
+    trades = results[1];
+    market = results[2];
+    retirement = results[3];
+    assets = results[4];
   } catch (err) {
     document.body.classList.remove("loading");
     document.getElementById("app").textContent =
       "Error loading data: " + err.message;
     return;
   }
+
+  // Yield one frame so the browser can paint the skeleton before we start
+  // processing data. Without this, the async handler resumes from the awaits
+  // above and immediately runs heavy synchronous work, giving the browser no
+  // opportunity to paint.
+  await new Promise(function (r) { requestAnimationFrame(r); });
 
   var fullData = processData(trades, market);
   if (!fullData) {
@@ -2454,7 +2483,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   mergeRetirement(fullData, retirement, market);
   mergeAssets(fullData, assets, market);
   applySymbolOrder(fullData, SYMBOL_ORDER);
-  var gainsData = computeGains(trades || [], market || []);
+  var gainsData = null;
   if (fullData.chartData.length < 2) {
     document.body.classList.remove("loading");
     document.getElementById("app").textContent = "Not enough data to display.";
@@ -2562,12 +2591,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     document.getElementById("detail-fetched").textContent = "Fetched " + fetchedLabel;
   }
 
-  buildHistoryTable(fullData, retirement, rebuildAll, trades, marketTickers);
-  buildGainsPanel(gainsData, fullData, trades, retirement, assets);
-  buildAllocationPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG, EXPOSURE_DISPLAY);
-  buildSettingsPanel(document.getElementById("panel-settings"), reloadAllData);
-  showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
-
   // Defer canvas setup to rAF so clientWidth is read after layout is complete.
   requestAnimationFrame(function () {
     chartRef = setupCanvas(canvas, wrap);
@@ -2576,6 +2599,22 @@ document.addEventListener("DOMContentLoaded", async function () {
     updateDetail(state.data, state.data.chartData.length - 1);
     attachListeners(canvas, state, chartRef);
     document.body.classList.remove("loading");
+
+    // Build hidden panels after first paint so they don't block FCP.
+    // Each panel is its own task (chained setTimeout) so the browser can
+    // paint frames and handle input between builds.
+    setTimeout(function () {
+      gainsData = computeGains(trades || [], market || []);
+      buildHistoryTable(fullData, retirement, rebuildAll, trades, marketTickers);
+      setTimeout(function () {
+        buildGainsPanel(gainsData, fullData, trades, retirement, assets);
+        setTimeout(function () {
+          buildAllocationPanel(fullData, EXPOSURE_MAP, REBALANCING_CONFIG, EXPOSURE_DISPLAY);
+          buildSettingsPanel(document.getElementById("panel-settings"), reloadAllData);
+          showBanner(Portfolio.validateData(trades, gainsData, retirement, market, { exposureMap: EXPOSURE_MAP, symbolOrder: SYMBOL_ORDER, assets: assets }));
+        }, 0);
+      }, 0);
+    }, 0);
   });
 
   document.getElementById("banner-dismiss").addEventListener("click", function () {
