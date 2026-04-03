@@ -1,6 +1,6 @@
 const { describe, it } = require("node:test");
 const assert = require("node:assert/strict");
-const { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, getIP, serverLog, serverWarn, sendCached } = require("../app/serve.js");
+const { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, getIP, AUTH_RATE, serverLog, serverWarn, sendCached } = require("../app/serve.js");
 
 // ---------------------------------------------------------------------------
 // csvToJson
@@ -277,8 +277,8 @@ describe("getIP", () => {
     assert.equal(getIP(mockReq("127.0.0.1", "10.0.0.2")), "10.0.0.2");
   });
 
-  it("takes the first IP from a comma-separated X-Forwarded-For list", () => {
-    assert.equal(getIP(mockReq("127.0.0.1", "10.0.0.2, 172.16.0.1")), "10.0.0.2");
+  it("takes the last IP from a comma-separated X-Forwarded-For list (proxy-appended, not client-supplied)", () => {
+    assert.equal(getIP(mockReq("127.0.0.1", "10.0.0.2, 172.16.0.1")), "172.16.0.1");
   });
 
   it("trims whitespace from X-Forwarded-For", () => {
@@ -287,6 +287,51 @@ describe("getIP", () => {
 
   it("returns 'unknown' when socket address is missing", () => {
     assert.equal(getIP({ headers: {}, socket: {} }), "unknown");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AUTH_RATE
+// ---------------------------------------------------------------------------
+
+describe("AUTH_RATE", () => {
+  // Helper: get a unique IP per test to avoid cross-test state.
+  let _n = 0;
+  const freshIP = () => `10.99.99.${_n++}`;
+
+  it("returns 0 delay for an IP with no prior failures", () => {
+    assert.equal(AUTH_RATE.delay(freshIP()), 0);
+  });
+
+  it("returns BASE_MS after the first failure", () => {
+    const ip = freshIP();
+    AUTH_RATE.record(ip);
+    assert.equal(AUTH_RATE.delay(ip), AUTH_RATE.BASE_MS);
+    AUTH_RATE.reset(ip);
+  });
+
+  it("doubles the delay on each subsequent failure", () => {
+    const ip = freshIP();
+    AUTH_RATE.record(ip); // 1 → 200 ms
+    AUTH_RATE.record(ip); // 2 → 400 ms
+    AUTH_RATE.record(ip); // 3 → 800 ms
+    assert.equal(AUTH_RATE.delay(ip), AUTH_RATE.BASE_MS * 4);
+    AUTH_RATE.reset(ip);
+  });
+
+  it("caps delay at MAX_MS regardless of failure count", () => {
+    const ip = freshIP();
+    for (let i = 0; i < 20; i++) AUTH_RATE.record(ip);
+    assert.equal(AUTH_RATE.delay(ip), AUTH_RATE.MAX_MS);
+    AUTH_RATE.reset(ip);
+  });
+
+  it("reset clears the counter so the next attempt has no delay", () => {
+    const ip = freshIP();
+    AUTH_RATE.record(ip);
+    AUTH_RATE.record(ip);
+    AUTH_RATE.reset(ip);
+    assert.equal(AUTH_RATE.delay(ip), 0);
   });
 });
 

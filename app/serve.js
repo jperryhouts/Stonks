@@ -39,6 +39,37 @@ if (AUTH_PASS.startsWith(SCRYPT_PREFIX)) {
     }
 }
 
+/** Per-IP authentication rate limiter using exponential backoff.
+ *  After each failed attempt the IP must wait BASE_MS × 2^(failures−1),
+ *  capped at MAX_MS.  Counters expire automatically after EXPIRY_MS of
+ *  inactivity so legitimate users are never permanently locked out.
+ */
+const AUTH_RATE = {
+    BASE_MS:   200,
+    MAX_MS:    30_000,
+    EXPIRY_MS: 60 * 60 * 1000, // 1 hour
+    _map:      new Map(),       // ip → { n: failureCount, ts: lastFailureTime }
+
+    /** Milliseconds to wait before processing an auth attempt from this IP. */
+    delay(ip) {
+        const e = this._map.get(ip);
+        if (!e) return 0;
+        if (Date.now() - e.ts > this.EXPIRY_MS) { this._map.delete(ip); return 0; }
+        return Math.min(this.BASE_MS * Math.pow(2, e.n - 1), this.MAX_MS);
+    },
+
+    /** Record a failed attempt. */
+    record(ip) {
+        const e = this._map.get(ip) || { n: 0, ts: 0 };
+        e.n++;
+        e.ts = Date.now();
+        this._map.set(ip, e);
+    },
+
+    /** Clear the counter after a successful login. */
+    reset(ip) { this._map.delete(ip); },
+};
+
 const MIME = {
     ".html": "text/html",
     ".css":  "text/css",
@@ -259,10 +290,14 @@ function readBody(req) {
     });
 }
 
-/** Extract the client's IP address, preferring X-Forwarded-For when present. */
+/** Extract the client's IP address, preferring X-Forwarded-For when present.
+ *  Takes the LAST entry in X-Forwarded-For — that is the IP appended by the
+ *  nearest trusted reverse proxy and cannot be forged by the client.
+ *  (The first entry is client-supplied and trivially spoofable.)
+ */
 function getIP(req) {
     const fwd = req.headers["x-forwarded-for"];
-    const raw = fwd ? fwd.split(",")[0].trim() : (req.socket.remoteAddress || "unknown");
+    const raw = fwd ? fwd.split(",").at(-1).trim() : (req.socket.remoteAddress || "unknown");
     return raw.replace(/^::ffff:/, ""); // strip IPv4-mapped IPv6 prefix
 }
 
@@ -306,8 +341,14 @@ async function verifyPassword(candidate) {
 /** Check Basic Auth credentials. Returns true if valid or auth is disabled. */
 async function checkAuth(req, res, ip) {
     if (!AUTH_ENABLED) return true;
+
+    // Apply backoff delay for IPs with prior failures (non-blocking async wait).
+    const delay = AUTH_RATE.delay(ip);
+    if (delay > 0) await new Promise(r => setTimeout(r, delay));
+
     const header = req.headers.authorization || "";
     if (!header.startsWith("Basic ")) {
+        AUTH_RATE.record(ip);
         res.writeHead(401, { ...SEC_HEADERS, "WWW-Authenticate": 'Basic realm="Portfolio"' });
         res.end("Unauthorized");
         return false;
@@ -315,6 +356,7 @@ async function checkAuth(req, res, ip) {
     const decoded = Buffer.from(header.slice(6), "base64").toString();
     const colon = decoded.indexOf(":");
     if (colon < 0) {
+        AUTH_RATE.record(ip);
         serverWarn(ip, "bad auth header (no colon in credentials)");
         res.writeHead(401, { ...SEC_HEADERS, "WWW-Authenticate": 'Basic realm="Portfolio"' });
         res.end("Unauthorized");
@@ -322,11 +364,13 @@ async function checkAuth(req, res, ip) {
     }
     const pass = decoded.slice(colon + 1);
     if (!await verifyPassword(pass)) {
+        AUTH_RATE.record(ip);
         serverWarn(ip, AUTH_LOG_PASSWORDS ? `bad password: "${pass}"` : "authentication failed");
         res.writeHead(401, { ...SEC_HEADERS, "WWW-Authenticate": 'Basic realm="Portfolio"' });
         res.end("Unauthorized");
         return false;
     }
+    AUTH_RATE.reset(ip);
     return true;
 }
 
@@ -870,4 +914,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, validateConfig, validateAssets, getIP, serverLog, serverWarn, sendCached, server };
+module.exports = { csvToJson, prettyJson, validateTrades, validateRetirement, normalizeTrades, normalizeRetirement, validateConfig, validateAssets, getIP, AUTH_RATE, serverLog, serverWarn, sendCached, server };
