@@ -343,6 +343,7 @@
         // Track state per pane
         var state = {
           loaded: false,
+          etag: null,
           pane: pane,
           textarea: textarea,
           issuesBox: issuesBox,
@@ -389,6 +390,7 @@
           fetch(subtab.dataUrl)
             .then(function (r) {
               if (!r.ok) throw new Error("HTTP " + r.status);
+              state.etag = r.headers.get("etag");
               return r.text();
             })
             .then(function (text) {
@@ -429,9 +431,12 @@
             body = JSON.stringify(result.parsed);
           }
 
+          var saveHeaders = { "Content-Type": "application/json" };
+          if (state.etag) saveHeaders["If-Match"] = state.etag;
+
           fetch(subtab.saveUrl, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: saveHeaders,
             body: body,
           })
             .then(function (r) {
@@ -440,7 +445,9 @@
               });
             })
             .then(function (resp) {
-              if (resp.data.error) {
+              if (resp.status === 412) {
+                showIssues(["Save failed: file was modified externally. Reload the page to get the latest version, then re-apply your changes."]);
+              } else if (resp.data.error) {
                 showIssues([resp.data.error]);
               } else {
                 clearIssues();

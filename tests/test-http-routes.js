@@ -43,7 +43,7 @@ function get(urlPath, reqHeaders) {
 }
 
 /** POST JSON to the test server; resolves with {status, body}. */
-function post(urlPath, payload) {
+function post(urlPath, payload, extraHeaders) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(payload);
     const req = http.request(
@@ -55,6 +55,7 @@ function post(urlPath, payload) {
         headers: {
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(data),
+          ...extraHeaders,
         },
       },
       (res) => {
@@ -284,3 +285,96 @@ describe("GET /js/app-bundle.js", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Optimistic locking: If-Match on POST /api/config
+// ---------------------------------------------------------------------------
+
+describe("If-Match on POST /api/config", () => {
+  const VALID_CONFIG = JSON.stringify({ symbolOrder: ["VTI"] });
+
+  it("returns 200 when no If-Match header is sent (no locking check)", async () => {
+    const r = await post("/api/config", { content: VALID_CONFIG });
+    assert.equal(r.status, 200);
+  });
+
+  it("returns 412 when If-Match header does not match current ETag", async () => {
+    // Ensure the file exists first
+    await post("/api/config", { content: VALID_CONFIG });
+    // Now POST with a stale ETag
+    const r = await post("/api/config", { content: VALID_CONFIG }, { "if-match": '"stale-etag-00000"' });
+    assert.equal(r.status, 412);
+    assert.ok(r.body.error, "response should include an error message");
+  });
+
+  it("returns 200 when If-Match header matches the current ETag", async () => {
+    // Write first to ensure file exists
+    await post("/api/config", { content: VALID_CONFIG });
+    // GET to obtain current ETag
+    const getRes = await get("/data/config.json");
+    const etag = getRes.headers["etag"];
+    assert.ok(etag, "GET /data/config.json should return an etag");
+    // POST with matching ETag
+    const r = await post("/api/config", { content: VALID_CONFIG }, { "if-match": etag });
+    assert.equal(r.status, 200);
+    assert.ok(r.body.ok);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Optimistic locking: If-Match on POST /api/assets
+// ---------------------------------------------------------------------------
+
+describe("If-Match on POST /api/assets", () => {
+  const VALID_ASSETS = JSON.stringify([]);
+
+  it("returns 412 when If-Match header does not match current ETag", async () => {
+    await post("/api/assets", { content: VALID_ASSETS });
+    const r = await post("/api/assets", { content: VALID_ASSETS }, { "if-match": '"stale-etag-00000"' });
+    assert.equal(r.status, 412);
+    assert.ok(r.body.error);
+  });
+
+  it("returns 200 when If-Match header matches the current ETag", async () => {
+    await post("/api/assets", { content: VALID_ASSETS });
+    const getRes = await get("/data/assets.json");
+    const etag = getRes.headers["etag"];
+    assert.ok(etag);
+    const r = await post("/api/assets", { content: VALID_ASSETS }, { "if-match": etag });
+    assert.equal(r.status, 200);
+    assert.ok(r.body.ok);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Optimistic locking: If-Match on POST /api/retirement
+// ---------------------------------------------------------------------------
+
+describe("If-Match on POST /api/retirement", () => {
+  const VALID_RETIREMENT = JSON.stringify({ accounts: [], contributions: [], values: [] });
+
+  it("returns 412 when If-Match header does not match current ETag", async () => {
+    await post("/api/retirement", JSON.parse(VALID_RETIREMENT));
+    const r = await post("/api/retirement", JSON.parse(VALID_RETIREMENT), { "if-match": '"stale-etag-00000"' });
+    assert.equal(r.status, 412);
+    assert.ok(r.body.error);
+  });
+
+  it("returns 200 when If-Match header matches the current ETag", async () => {
+    await post("/api/retirement", JSON.parse(VALID_RETIREMENT));
+    const getRes = await get("/data/retirement.json");
+    const etag = getRes.headers["etag"];
+    assert.ok(etag);
+    const r = await post("/api/retirement", JSON.parse(VALID_RETIREMENT), { "if-match": etag });
+    assert.equal(r.status, 200);
+    assert.ok(r.body.ok);
+  });
+
+  it("success response includes etag for the newly written file", async () => {
+    const r = await post("/api/retirement", JSON.parse(VALID_RETIREMENT));
+    assert.equal(r.status, 200);
+    assert.ok(r.body.etag, "response should include etag so clients can stay in sync");
+    // ETag should match what a subsequent GET returns
+    const getRes = await get("/data/retirement.json");
+    assert.equal(r.body.etag, getRes.headers["etag"]);
+  });
+});

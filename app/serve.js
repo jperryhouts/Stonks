@@ -185,6 +185,27 @@ function getCachedFile(filePath) {
 }
 
 /**
+ * Optimistic locking check for write endpoints.
+ * If the request has an If-Match header, compare it to the file's current
+ * mtime-based ETag. Returns true if the write should proceed, false if it
+ * should be rejected with 412 Precondition Failed.
+ * When the file does not exist yet there is nothing to conflict with, so
+ * true is returned regardless of the header value.
+ */
+function checkIfMatch(req, filePath) {
+    const ifMatch = req.headers["if-match"];
+    if (!ifMatch) return true;
+    let mtime;
+    try {
+        mtime = fs.statSync(filePath).mtimeMs;
+    } catch (e) {
+        if (e.code === "ENOENT") return true;
+        throw e;
+    }
+    return ifMatch === ('"' + mtime + '"');
+}
+
+/**
  * Write a successful cached response, serving gzip when the client accepts it
  * and a compressed buffer exists. extraHeaders is merged into the response.
  * Sends 304 Not Modified when the client's If-None-Match matches the entry mtime.
@@ -598,6 +619,12 @@ const server = http.createServer(async (req, res) => {
     // --- API: save retirement account values ---
     if (pathname === "/api/retirement" && req.method === "POST") {
         try {
+            const retirementPath = path.join(DATA_DIR, "retirement.json");
+            if (!checkIfMatch(req, retirementPath)) {
+                res.writeHead(412, { ...SEC_HEADERS, "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: "Precondition Failed: file was modified since last loaded" }));
+                return;
+            }
             const body = await readBody(req);
             const retirementErr = validateRetirement(body);
             if (retirementErr) {
@@ -606,16 +633,19 @@ const server = http.createServer(async (req, res) => {
                 return;
             }
             const clean = normalizeRetirement(body);
-            const retirementPath = path.join(DATA_DIR, "retirement.json");
             const retirementContent = prettyJson(clean);
             writeFileAtomic(retirementPath, retirementContent);
+            let newEtag = null;
             try {
                 const written = Buffer.from(retirementContent);
                 const gz = written.length >= 1024 ? zlib.gzipSync(written) : null;
-                fileCache.set(retirementPath, { mtime: fs.statSync(retirementPath).mtimeMs, data: written, gz });
+                const newMtime = fs.statSync(retirementPath).mtimeMs;
+                fileCache.set(retirementPath, { mtime: newMtime, data: written, gz });
+                newEtag = '"' + newMtime + '"';
             } catch (_) {}
+            serverLog(ip, "retirement saved");
             res.writeHead(200, { ...SEC_HEADERS, "Content-Type": "application/json" });
-            res.end(JSON.stringify({ ok: true, values: clean.values.length }));
+            res.end(JSON.stringify({ ok: true, values: clean.values.length, etag: newEtag }));
         } catch (e) {
             const status = e.statusCode || 500;
             console.error("POST /api/retirement error:", e);
@@ -628,6 +658,12 @@ const server = http.createServer(async (req, res) => {
     // --- API: save config ---
     if (pathname === "/api/config" && req.method === "POST") {
         try {
+            const configPath = path.join(DATA_DIR, "config.json");
+            if (!checkIfMatch(req, configPath)) {
+                res.writeHead(412, { ...SEC_HEADERS, "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: "Precondition Failed: file was modified since last loaded" }));
+                return;
+            }
             const body = await readBody(req);
             if (!body || typeof body.content !== "string") {
                 res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" });
@@ -647,7 +683,6 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: configErr }));
                 return;
             }
-            const configPath = path.join(DATA_DIR, "config.json");
             writeFileAtomic(configPath, body.content);
             try {
                 const written = Buffer.from(body.content);
@@ -669,6 +704,12 @@ const server = http.createServer(async (req, res) => {
     // --- API: save assets ---
     if (pathname === "/api/assets" && req.method === "POST") {
         try {
+            const assetsPath = path.join(DATA_DIR, "assets.json");
+            if (!checkIfMatch(req, assetsPath)) {
+                res.writeHead(412, { ...SEC_HEADERS, "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: "Precondition Failed: file was modified since last loaded" }));
+                return;
+            }
             const body = await readBody(req);
             if (!body || typeof body.content !== "string") {
                 res.writeHead(400, { ...SEC_HEADERS, "Content-Type": "application/json" });
@@ -688,7 +729,6 @@ const server = http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ error: assetsErr }));
                 return;
             }
-            const assetsPath = path.join(DATA_DIR, "assets.json");
             writeFileAtomic(assetsPath, body.content);
             try {
                 const written = Buffer.from(body.content);

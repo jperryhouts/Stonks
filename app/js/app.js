@@ -47,6 +47,20 @@ async function fetchJSON(url) {
   return res.json();
 }
 
+// ETag captured from the last GET of retirement.json; sent as If-Match on writes.
+var retirementEtag = null;
+
+async function fetchRetirementData() {
+  try {
+    var res = await fetch("data/retirement.json");
+    if (!res.ok) return null;
+    retirementEtag = res.headers.get("etag");
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
 // Config parser — loaded from js/config.js via Portfolio namespace
 var parseConfig = Portfolio.parseConfig;
 
@@ -506,6 +520,11 @@ function _histGetEditDialog() {
   btnRow.appendChild(delBtn);
   dlg.appendChild(btnRow);
 
+  var statusEl = document.createElement("div");
+  statusEl.className = "hist-edit-status";
+  statusEl.style.display = "none";
+  dlg.appendChild(statusEl);
+
   document.body.appendChild(dlg);
 
   // Dismiss on outside click
@@ -532,6 +551,8 @@ function _histEditShow(td, date, sym, retirement, rebuildAll, currentVal) {
   _histEditState = { date: date, account: sym, retirement: retirement, rebuildAll: rebuildAll };
 
   dlg.querySelector(".hist-edit-header").textContent = sym + " \u2014 " + date;
+  var statusEl = dlg.querySelector(".hist-edit-status");
+  if (statusEl) { statusEl.textContent = ""; statusEl.style.display = "none"; }
 
   // Pre-populate with existing ground-truth value; fall back to interpolated cell value
   var existingVal = "";
@@ -612,18 +633,31 @@ function _histEditDelete() {
 
 function _histEditPost(state) {
   var payload = { accounts: state.retirement.accounts, values: state.retirement.values, contributions: state.retirement.contributions };
-  _histEditHide();
+  var headers = { "Content-Type": "application/json" };
+  if (retirementEtag) headers["If-Match"] = retirementEtag;
+  var dlg = _histEditDlg;
+  var statusEl = dlg ? dlg.querySelector(".hist-edit-status") : null;
   fetch("/api/retirement", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: headers,
     body: JSON.stringify(payload),
   })
-    .then(function (res) { return res.json(); })
-    .then(function (result) {
-      if (!result.error && state.rebuildAll) state.rebuildAll();
+    .then(function (res) { return res.json().then(function (data) { return { status: res.status, data: data }; }); })
+    .then(function (resp) {
+      if (resp.status === 412) {
+        if (statusEl) {
+          statusEl.textContent = "Save failed: file was modified externally. Reload the page and re-apply your edit.";
+          statusEl.style.display = "";
+        }
+        return;
+      }
+      if (resp.data.etag) retirementEtag = resp.data.etag;
+      _histEditHide();
+      if (!resp.data.error && state.rebuildAll) state.rebuildAll();
     })
     .catch(function (err) {
       console.error("Failed to save retirement value:", err);
+      _histEditHide();
     });
 }
 
@@ -2015,18 +2049,25 @@ function buildContributionsPanel(retirement, onSave) {
     status.style.color = "#666";
     saveBtn.disabled = true;
 
+    var contribHeaders = { "Content-Type": "application/json" };
+    if (retirementEtag) contribHeaders["If-Match"] = retirementEtag;
+
     fetch("/api/retirement", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: contribHeaders,
       body: JSON.stringify(payload),
     })
-      .then(function (res) { return res.json(); })
-      .then(function (result) {
+      .then(function (res) { return res.json().then(function (data) { return { status: res.status, data: data }; }); })
+      .then(function (resp) {
         saveBtn.disabled = false;
-        if (result.error) {
-          status.textContent = result.error;
+        if (resp.status === 412) {
+          status.textContent = "Save failed: file was modified externally. Reload the page and re-apply your changes.";
+          status.style.color = "#dc2626";
+        } else if (resp.data.error) {
+          status.textContent = resp.data.error;
           status.style.color = "#dc2626";
         } else {
+          if (resp.data.etag) retirementEtag = resp.data.etag;
           allContribs = merged;
           status.textContent = "Saved " + updatedContribs.length + " contribution" + (updatedContribs.length === 1 ? "" : "s") + ".";
           status.style.color = "#16a34a";
@@ -2456,7 +2497,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       loadConfig(),
       fetchJSON("data/trades.json"),
       fetchJSON("data/market.json"),
-      fetchJSON("data/retirement.json").catch(function () { return null; }),
+      fetchRetirementData(),
       fetchJSON("data/assets.json").catch(function () { return null; }),
     ]);
     trades = results[1];
@@ -2536,7 +2577,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     Promise.all([
       fetchJSON("data/trades.json"),
       fetchJSON("data/market.json"),
-      fetchJSON("data/retirement.json").catch(function () { return null; }),
+      fetchRetirementData(),
       fetchJSON("data/assets.json").catch(function () { return null; }),
     ])
       .then(function (results) {
